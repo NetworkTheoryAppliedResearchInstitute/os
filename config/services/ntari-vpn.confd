@@ -1,0 +1,27 @@
+# NTARI OS — ntari-vpn OpenRC service configuration
+# /etc/conf.d/ntari-vpn
+#
+# ntari-vpn wraps WireGuard with ROS2 graph health publishing.
+# WireGuard itself is configured in /etc/ntari/wireguard/wg-ntari.conf.
+
+# WireGuard interface name
+NTARI_VPN_IFACE="wg-ntari"
+
+# Path to the WireGuard configuration file.
+# The init script writes a placeholder with a generated keypair if absent.
+NTARI_VPN_WG_CONF="/etc/ntari/wireguard/wg-ntari.conf"
+
+# Federation overlay network subnet (used when auto-assigning peer IPs)
+NTARI_VPN_SUBNET="10.99.0.0/24"
+
+# UDP port for WireGuard (must be open on any firewalls / port-forwarding)
+NTARI_VPN_PORT=51820
+
+# Health publish interval in seconds
+NTARI_VPN_HEALTH_INTERVAL=30
+
+# ROS2 domain ID for health topic publishing
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"

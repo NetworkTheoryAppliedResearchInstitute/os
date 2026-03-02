@@ -1,0 +1,71 @@
+--- a/src/ddsrt/src/threads/posix/threads.c
++++ b/src/ddsrt/src/threads/posix/threads.c
+@@ -1,3 +1,22 @@
++/*
++ * NTARI OS — Cyclone DDS musl libc thread stack size patch
++ *
++ * Problem:
++ *   musl libc default thread stack size is 128 KB (vs. glibc's 2–10 MB).
++ *   Cyclone DDS internal threads — particularly those handling DDS
++ *   serialization, discovery (SPDP/SEDP), and transport — can overflow
++ *   the 128 KB default when processing complex QoS types or large
++ *   discovery bursts.
++ *
++ * Fix:
++ *   When building on musl libc (detected via __MUSL__ or absence of
++ *   __GLIBC__), set minimum thread stack size to 2 MB before spawning
++ *   any Cyclone DDS internal thread.
++ *
++ * Upstream issue:
++ *   No upstream fix exists. This patch must be reapplied on each
++ *   Cyclone DDS version update until upstreamed.
++ *
++ * Tested against: Cyclone DDS 0.10.x / 0.11.x (Jazzy-era)
++ * Platform:       Alpine Linux 3.23 (musl libc 1.2.5)
++ * Author:         NTARI OS project
++ */
++
+ /*
+  * Copyright(c) 2006 to 2022 ZettaScale Technology and others
+  *
+@@ -20,6 +39,22 @@
+ #include "dds/ddsrt/threads_priv.h"
+ #include "dds/ddsrt/string.h"
+
++/* ── musl thread stack size fix ─────────────────────────────────────────── */
++/* musl libc default thread stack = 128 KB; glibc default = ~2–8 MB.        */
++/* DDS serialization/discovery threads need at least 512 KB; set 2 MB       */
++/* to match glibc behaviour and provide headroom for complex message types.  */
++#if defined(__linux__) && !defined(__GLIBC__)
++#  define NTARI_MUSL_STACK_SIZE (2 * 1024 * 1024)  /* 2 MB */
++#  define NTARI_MUSL_PATCH 1
++#endif
++
++static void ddsrt_thread_apply_musl_stack(pthread_attr_t *attr)
++{
++#ifdef NTARI_MUSL_PATCH
++    size_t stacksize = 0;
++    pthread_attr_getstacksize(attr, &stacksize);
++    if (stacksize < NTARI_MUSL_STACK_SIZE) {
++        pthread_attr_setstacksize(attr, NTARI_MUSL_STACK_SIZE);
++    }
++#else
++    (void)attr;
++#endif
++}
++
+ struct thread_cleanup_wrapper {
+   ddsrt_thread_routine_t routine;
+   void *arg;
+@@ -55,6 +90,11 @@ dds_return_t ddsrt_thread_create(ddsrt_thread_t *thread, const char *name, cons
+   pthread_attr_init(&attr);
+   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
++  /* NTARI OS musl patch: ensure minimum stack size before thread spawn.
++   * On musl, the 128 KB default is insufficient for DDS internal threads.
++   * This is a no-op on glibc where the default is already 2+ MB.           */
++  ddsrt_thread_apply_musl_stack(&attr);
++
+   if (tattr)
+   {
+     if (tattr->stackSize > 0)

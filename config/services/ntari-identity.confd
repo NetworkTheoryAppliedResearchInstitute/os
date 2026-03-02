@@ -1,0 +1,28 @@
+# NTARI OS — ntari-identity OpenRC service configuration
+# /etc/conf.d/ntari-identity
+#
+# ntari-identity wraps an identity provider (Kanidm or FreeIPA)
+# with ROS2 graph health publishing.
+
+# Identity backend selection.
+# "kanidm"  — Lightweight Rust IdP. Recommended for edge hardware (< 512MB RAM).
+#             Provides OAuth2, LDAP, PAM/NSS. No Kerberos (Phase 9 consideration).
+# "freeipa" — Full Kerberos + LDAP + PKI stack. Requires > 512MB RAM.
+#             Supports cross-cooperative Kerberos federation.
+NTARI_IDENTITY_BACKEND="kanidm"
+
+# Kanidm configuration file path
+NTARI_IDENTITY_KANIDM_CONF="/etc/ntari/kanidm/server.toml"
+
+# FreeIPA realm (used only when NTARI_IDENTITY_BACKEND=freeipa)
+NTARI_IDENTITY_IPA_REALM="NTARI.LOCAL"
+NTARI_IDENTITY_IPA_DOMAIN="ntari.local"
+
+# Health publish interval in seconds
+NTARI_IDENTITY_HEALTH_INTERVAL=30
+
+# ROS2 domain ID for health topic publishing
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"

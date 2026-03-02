@@ -1,0 +1,4030 @@
+# NTARI OS Technical Specification v1.1
+
+## Network Theory Applied Research Institute Operating System
+**A Cooperative Infrastructure Platform for Distributed Economic Coordination**
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [System Architecture](#2-system-architecture)
+3. [Core Communication Layer](#3-core-communication-layer)
+4. [Storage Infrastructure](#4-storage-infrastructure)
+5. [Economic Coordination System](#5-economic-coordination-system)
+6. [Exit & Legacy Handoff Protocol](#6-exit--legacy-handoff-protocol)
+7. [Security & Privacy Framework](#7-security--privacy-framework)
+8. [Governance System](#8-governance-system)
+9. [Network Setup & Onboarding](#9-network-setup--onboarding)
+10. [Application Framework](#10-application-framework)
+11. [Implementation Requirements](#11-implementation-requirements)
+12. [Appendices](#12-appendices)
+
+---
+
+## 1. Executive Summary
+
+### 1.1 Purpose
+
+NTARI OS is a Linux distribution based on Alpine Linux, designed to operate Small Office/Home Office (SOHO) nodes within an integrated mesh network. The system enables:
+
+- **Peer-to-peer economic coordination** where hardware owners are prosumers
+- **Community-owned infrastructure** replacing extractive platform models
+- **Democratic governance** of network resources and policies
+- **Automated capability discovery** and job matching
+- **Cooperative storage** replacing centralized cloud services
+
+### 1.2 Design Principles
+
+1. **No Extraction**: Economic benefits accrue to participants, not platform owners
+2. **Mutual Benefit**: Incentive structures assume good faith and reward cooperation
+3. **Democratic**: Governance is transparent and community-controlled
+4. **Dignity**: Exit is honored, participation is voluntary
+5. **Hardware Longevity**: System optimizes for equipment lifespan, not planned obsolescence
+6. **Privacy by Design**: Explicit consent required for sensitive hardware access
+
+### 1.3 Target Hardware & Device Support
+
+**Desktop/Server Reference Platform**: Intel i5-8500T (6 cores), 8GB RAM, x86_64  
+**Supported Architectures**: x86_64, ARM64, ARMv7 (32-bit), Android, iOS  
+
+**Minimum Requirements**:
+- **Desktop/Server**: 1 CPU core, 512MB RAM, 4GB storage
+- **Mobile**: Android 8.0+ or iOS 13.0+, 2GB RAM, 20GB available storage
+
+**Deployment Options**:
+
+1. **NTARI OS Server Edition** (Headless)
+   - Terminal-only interface, no GUI
+   - Target: Raspberry Pi, servers, headless nodes
+   - Size: ~180MB
+   - Users: Tech enthusiasts, infrastructure nodes
+
+2. **NTARI OS Desktop Edition** (GUI)
+   - XFCE/LXQt graphical desktop environment
+   - Target: Regular users, families, small businesses
+   - Size: ~800MB-1.2GB
+   - Users: Mainstream adoption, grandmother-friendly
+
+3. **NTARI OS Lite Edition** (Minimal GUI)
+   - Basic graphical interface, limited features
+   - Target: Old computers, low-RAM devices
+   - Size: ~400MB
+   - Users: Resource-constrained hardware
+
+4. **NTARI Android App** (Native)
+   - Background service for storage/compute contribution
+   - Full job marketplace and governance access
+   - Target: Android 8.0+ smartphones and tablets
+   - Users: Mobile-first participants
+
+5. **NTARI iOS App** (Native)
+   - Limited background processing
+   - Full job marketplace and governance access
+   - Economic participation focus
+   - Target: iOS 13.0+ iPhones and iPads
+   - Users: Apple ecosystem participants
+
+**Typical Deployment**: Raspberry Pi 4, consumer desktops, refurbished hardware, Android smartphones, iPhones
+
+### 1.4 Key Innovations
+
+- **ROS2-inspired topology** for distributed systems coordination
+- **Tiered storage strategy** optimizing for write patterns and media type
+- **Positive exit incentives** using economic rewards, not penalties
+- **Blockchain-based time consensus** via transaction "tics"
+- **Automatic capability discovery** and network onboarding
+- **Multi-platform architecture** spanning desktop, mobile, and embedded devices
+- **Leveson-Based reputation system** (LBTAS) using safety-critical software assessment methodology
+- **OpenStreetMap integration** for geographic network visualization
+- **Hybrid interface strategy** combining TUI, GUI, and web dashboards
+
+---
+
+## 2. System Architecture
+
+### 2.1 Layer Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 5: Applications (Agrinet, Manufacturing, etc.)        │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 4: Economic Coordination (SoHoLINK)                   │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 3: Service Layer (Storage, DNS, Time Sync)            │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 2: Communication (DDS Middleware, Topic Management)   │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 1: Base OS (Alpine Linux + NTARI Extensions)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Layer 1: Base Operating System
+
+**Components:**
+- Alpine Linux (musl libc, BusyBox)
+- Kernel: Linux 6.x with mesh networking support (batman-adv, 802.11s)
+- Package Manager: apk with NTARI repository
+- Init System: OpenRC
+- Security: Mandatory Access Control via AppArmor
+
+**NTARI Extensions:**
+```
+/usr/bin/ntari              # CLI tool
+/etc/ntari/                 # Configuration directory
+/opt/ntari/                 # Application directory
+/var/lib/ntari/             # State and data
+/var/log/ntari/             # Logging
+```
+
+### 2.3 Layer 2: Communication Layer (DDS Middleware)
+
+**DDS Implementation:**
+- **Primary**: Cyclone DDS (Eclipse Foundation, LGPL)
+- **Alternative**: Fast DDS (eProsima, Apache 2.0)
+- **Abstraction**: NTARI RMW (ROS2 Middleware) adaptation layer
+
+**DDS Domain Allocation:**
+```yaml
+domains:
+  0: system           # Core OS functions
+  1: agrinet          # Agricultural protocol
+  2: manufacturing    # 3D printing networks
+  3: logistics        # Delivery/drone coordination
+  4: governance       # Democratic decision-making
+  5-99: application   # Reserved for future apps
+  100-232: user       # User-defined domains
+```
+
+**DDS Configuration Manager:**
+```
+/etc/ntari/dds-config.yaml
+/usr/bin/ntari-dds-manager
+```
+
+### 2.4 Layer 3: Mandatory Service Layer
+
+**Core Services:**
+
+1. **Distributed Storage** (`ntari-storage-daemon`)
+   - Federated file system
+   - Erasure coding and replication
+   - Tier management
+   - Health monitoring
+
+2. **Local DNS** (`ntari-dns-resolver`)
+   - Mesh-local name resolution
+   - Integration with traditional DNS
+   - Caching layer
+
+3. **Time Synchronization** (`ntari-time-sync`)
+   - Transaction tic generation
+   - Blockchain-based consensus
+   - NTP fallback for internet-connected nodes
+
+4. **Network Directory** (`ntari-directory-service`)
+   - Node discovery
+   - Capability aggregation
+   - Geographic indexing
+
+### 2.5 Layer 4: Economic Coordination (SoHoLINK)
+
+**Components:**
+
+1. **Resource Broker** (`soholink-broker`)
+   - Matches jobs to capabilities
+   - Manages bidding/offer system
+   - Handles contracts
+
+2. **Agent Profile Manager** (`soholink-agent`)
+   - User skills and availability
+   - Portfolio management
+   - Reputation tracking
+
+3. **Payment Processor** (`soholink-payments`)
+   - Transaction logging
+   - Multi-currency support
+   - Escrow for contracts
+
+4. **Reputation Engine** (`soholink-reputation`)
+   - LBTAS score calculation
+   - Dispute resolution tracking
+
+### 2.6 Layer 5: Application Framework
+
+**Application Structure:**
+```
+/opt/ntari/apps/{app_name}/
+├── manifest.yaml       # DDS requirements, resource needs
+├── schema/            # Message type definitions
+├── bin/               # Executables
+├── config/            # Default configuration
+└── data/              # Application data
+```
+
+**Application Manifest Example:**
+```yaml
+name: agrinet
+version: 1.0.0
+dds_requirements:
+  implementation: cyclone
+  domain: 1
+  qos_profile: reliable
+resource_requirements:
+  compute: 0.5  # cores
+  memory: 256   # MB
+  storage: 100  # MB
+  network: 1    # Mbps
+permissions:
+  - /network/storage/read
+  - /soho/{uuid}/resources/sensors
+```
+
+### 2.7 User Interface Architecture
+
+NTARI OS provides multiple interface layers to serve different user populations and use cases:
+
+#### 2.7.1 Terminal User Interface (TUI) - Primary
+
+**Implementation**: ncurses, ratatui (Rust), or blessed (Node.js)  
+**Aesthetic**: "Hyper DOS + emojis" - clean box-drawing with modern icons  
+**Target**: Tech-savvy users, SSH access, low-resource nodes
+
+**Features**:
+- Keyboard-driven navigation with mouse support via GPM
+- Low resource usage (<10MB RAM)
+- Works over SSH
+- Perfect alignment (67 characters between box borders)
+
+**Example TUI Dashboard**:
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║ NTARI OS v1.1                    afi.local.ntari    [⚙ Settings]  ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║ ● ONLINE  24h 17m               Earnings (February)               ║
+║ ↑ 2.4 MB/s  ↓ 1.8 MB/s          ┌────────────────────────────┐   ║
+║ ⚡ 12W power draw                │ Storage:         $22.47    │   ║
+║                                 │ Compute:          $8.20    │   ║
+║ Contributing:                   │ Translation:    $180.00    │   ║
+║ ▓▓▓▓░░ 2 cores (33%)            │ ─────────────────────────  │   ║
+║ ▓▓░░░░ 2GB RAM (25%)            │ Total:          $210.67    │   ║
+║ ▓░░░░░ 10GB SSD (20%)           │ Paid out:       $180.00    │   ║
+║ ▓▓▓▓▓░ 100GB HDD (50%)          │ Pending:         $30.67    │   ║
+║                                 └────────────────────────────┘   ║
+║                                                                   ║
+║ LBTAS Assessment: 3.2 / 4.0 (Gold Tier 🏅)                       ║
+║ ────────────────────────────────────────────────────────────────  ║
+║ Reliability:    ████████░ 3.4   Usability:   ███████░░ 3.1       ║
+║ Performance:    ███████░░ 3.0   Support:     ████████░ 3.3       ║
+║                                                                   ║
+║ Scale: -1 (No Trust) to 4 (Delight) • 127 jobs                   ║
+║                                                                   ║
+║ [M]ap [J]obs [S]torage [H]ardware [G]overnance [Q]uit           ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+**CLI Commands**:
+```bash
+ntari status          # Show dashboard
+ntari network map     # ASCII network map, option to open web view
+ntari dashboard       # Launch web dashboard on port 8080
+ntari jobs browse     # Browse available jobs
+```
+
+#### 2.7.2 Desktop GUI (XFCE/LXQt) - Mainstream
+
+**Implementation**: XFCE 4.18+ or LXQt 1.4+  
+**Purpose**: Mainstream user adoption, familiar Windows/Mac-like interface  
+**Target**: Regular users who need graphical interfaces
+
+**Components**:
+- Custom NTARI Network application (main hub)
+- File manager integration for distributed storage
+- System tray indicator for node status
+- Notification system for jobs and governance
+
+**First Boot Wizard Flow**:
+1. Welcome screen
+2. Resource discovery (auto-detect hardware)
+3. Contribution configuration
+4. Profile setup
+5. Privacy settings
+6. Network discovery
+7. Identity generation
+
+#### 2.7.3 Web Dashboard - Visualization
+
+**Implementation**: HTTP server (port 8080) + Leaflet.js + OpenStreetMap  
+**Purpose**: Rich visualizations, especially geographic network maps
+
+**Technology Stack**:
+- Backend: Actix-web (Rust) or Flask (Python)
+- Maps: OpenStreetMap tiles + Leaflet.js
+- WebSocket: Live DDS updates
+
+**Network Map** (Leaflet.js + OpenStreetMap):
+```javascript
+const map = L.map('map').setView([38.25, -85.76], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+```
+
+**Offline Tile Support**:
+```bash
+ntari map download --city Louisville --zoom 10-15
+```
+
+#### 2.7.4 Mobile Applications
+
+**Android**: Native Kotlin/Compose, background service, full DDS integration  
+**iOS**: Native Swift/SwiftUI, limited background, job marketplace focus
+
+### 2.8 Mobile Platform Architecture
+
+#### 2.8.1 Android Integration
+
+**Architecture**:
+- UI Layer: Kotlin/Jetpack Compose
+- Service: NtariNodeService (foreground service)
+- DDS Client: Cyclone DDS Android port
+- WorkManager for scheduled tasks
+
+**Device Capabilities** (Samsung Galaxy S21 example):
+```json
+{
+  "device_type": "android_phone",
+  "capabilities": {
+    "storage": {"offered_gb": 30, "tier": "tier_2"},
+    "compute": {"cores_available": 2, "burst_only": true},
+    "sensors": {"gps": true, "camera": true}
+  },
+  "contribution_rules": {
+    "min_battery_percent": 20,
+    "wifi_only": true,
+    "charging_required_for_compute": true
+  }
+}
+```
+
+**Estimated Earnings**: $10-20/month passive + job marketplace
+
+#### 2.8.2 iOS Integration
+
+**Constraints**: Limited background processing, no continuous service  
+**Focus**: Job marketplace, governance, earnings tracking
+
+**Estimated Earnings**: $0-50/month (job-dependent, no passive income)
+
+---
+
+## 3. Core Communication Layer
+
+### 3.1 DDS Topic Schema
+
+#### 3.1.1 Identity & Presence Topics
+
+**`/soho/{uuid}/heartbeat`**
+
+*Purpose*: Periodic node liveness signal  
+*Publish Frequency*: Every 30 seconds  
+*QoS*: Best-effort, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": 1739577600,
+  "uptime_seconds": 86400,
+  "mesh_hops": 2,
+  "network_quality": {
+    "latency_ms": 45,
+    "packet_loss": 0.002,
+    "bandwidth_mbps": 10.5
+  },
+  "signature": "ed25519:{base64_signature}"
+}
+```
+
+**`/soho/{uuid}/profile`**
+
+*Purpose*: Node owner information and capabilities  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local (retained)
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "schema_version": "1.0.0",
+  "owner": {
+    "display_name": "String",
+    "bio": "String (max 500 chars)",
+    "location": {
+      "city": "String",
+      "state": "String",
+      "country": "ISO 3166-1 alpha-2",
+      "coordinates": {
+        "lat": "Float",
+        "lon": "Float"
+      },
+      "privacy": "city_only|exact|state_only|hidden"
+    }
+  },
+  "skills": ["String"],
+  "education": ["String"],
+  "interests": ["String"],
+  "languages": ["ISO 639-1 codes"],
+  "public_key": "ssh-ed25519 {key}",
+  "pgp_fingerprint": "String",
+  "updated": "Unix timestamp"
+}
+```
+
+**`/network/directory`**
+
+*Purpose*: Aggregated node discovery  
+*Publish Frequency*: Every 60 seconds  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "schema_version": "1.0.0",
+  "nodes": [
+    {
+      "soho_id": "ntari-{uuid}",
+      "display_name": "String",
+      "coordinates": {"lat": "Float", "lon": "Float"},
+      "distance_km": "Float",
+      "capabilities_summary": ["compute", "storage", "String"],
+      "reputation_score": "Float (0-5)",
+      "last_seen": "Unix timestamp",
+      "mesh_accessible": "Boolean",
+      "wan_accessible": "Boolean"
+    }
+  ],
+  "total_nodes": "Integer",
+  "your_position": {"lat": "Float", "lon": "Float"},
+  "network_topology": {
+    "mesh_nodes": "Integer",
+    "wan_nodes": "Integer",
+    "bridge_nodes": "Integer"
+  }
+}
+```
+
+#### 3.1.2 Resource Advertisement Topics
+
+**`/soho/{uuid}/resources/compute`**
+
+*Purpose*: Advertise available compute resources  
+*Publish Frequency*: Every 60 seconds or on significant change  
+*QoS*: Reliable, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "cpu": {
+    "model": "String",
+    "cores_total": "Integer",
+    "cores_available": "Integer",
+    "frequency_mhz": "Integer",
+    "architecture": "x86_64|aarch64|armv7l",
+    "features": ["avx2", "aes", "etc"],
+    "load_average": [1.5, 1.2, 0.8],
+    "temperature_celsius": "Float"
+  },
+  "gpu": {
+    "present": "Boolean",
+    "model": "String",
+    "cuda_cores": "Integer",
+    "vram_gb": "Float",
+    "available": "Boolean",
+    "driver_version": "String"
+  },
+  "ram": {
+    "total_gb": "Float",
+    "available_gb": "Float",
+    "type": "DDR3|DDR4|DDR5|LPDDR4",
+    "speed_mhz": "Integer"
+  }
+}
+```
+
+**`/soho/{uuid}/resources/storage`**
+
+*Purpose*: Advertise available storage resources  
+*Publish Frequency*: Every 60 seconds or on significant change  
+*QoS*: Reliable, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "drives": [
+    {
+      "device": "/dev/sdX",
+      "type": "HDD|SSD|NVME",
+      "model": "String",
+      "total_gb": "Float",
+      "offered_gb": "Float",
+      "mandatory_gb": 1.0,
+      "available_gb": "Float",
+      "filesystem": "ext4|xfs|btrfs",
+      "encrypted": "Boolean",
+      "mount_point": "String",
+      "smart_status": {
+        "health": "healthy|warning|failing",
+        "power_on_hours": "Integer",
+        "reallocated_sectors": "Integer",
+        "wear_level": "Integer (0-100, SSDs only)",
+        "total_writes_tb": "Float (SSDs only)"
+      }
+    }
+  ],
+  "tier_allocation": {
+    "tier_1_active_volatile_hdd": "Float (GB)",
+    "tier_2_reference_stable_ssd": "Float (GB)",
+    "tier_3_archival_cold_hdd": "Float (GB)",
+    "tier_4_hot_transactional_ssd": "Float (GB)"
+  },
+  "bandwidth_mbps": "Float"
+}
+```
+
+**`/soho/{uuid}/resources/network`**
+
+*Purpose*: Advertise network capabilities  
+*Publish Frequency*: Every 60 seconds  
+*QoS*: Best-effort, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "interfaces": [
+    {
+      "name": "eth0|wlan0|bat0",
+      "type": "ethernet|wifi|mesh|cellular",
+      "mac_address": "String",
+      "ipv4": ["String"],
+      "ipv6": ["String"],
+      "bandwidth_mbps": {
+        "upload": "Float",
+        "download": "Float"
+      },
+      "latency_to_gateway_ms": "Float",
+      "metered": "Boolean"
+    }
+  ],
+  "mesh_capabilities": {
+    "batman_adv": "Boolean",
+    "802_11s": "Boolean",
+    "bridge_node": "Boolean"
+  },
+  "nat_traversal": {
+    "upnp": "Boolean",
+    "stun_reachable": "Boolean",
+    "relay_required": "Boolean"
+  }
+}
+```
+
+**`/soho/{uuid}/resources/hardware`**
+
+*Purpose*: Advertise peripheral hardware  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "devices": [
+    {
+      "device_id": "String (unique)",
+      "type": "3d_printer|camera|sensor|drone|robot_arm|cnc",
+      "model": "String",
+      "manufacturer": "String",
+      "capabilities": ["String"],
+      "specifications": {
+        // Type-specific fields
+        // For 3D printer:
+        "build_volume_mm": [220, 220, 250],
+        "materials": ["PLA", "PETG", "ABS"],
+        "nozzle_sizes_mm": [0.4, 0.6],
+        "max_temp_celsius": 260
+      },
+      "available": "Boolean",
+      "security_level": "disabled|owner_supervised|autonomous",
+      "privacy_note": "String (optional)"
+    }
+  ],
+  "security_policy": {
+    "camera_access": "disabled|explicit_approval|supervised|autonomous",
+    "remote_control": "disabled|owner_present|autonomous",
+    "data_retention_hours": "Integer",
+    "require_2fa": "Boolean"
+  }
+}
+```
+
+#### 3.1.3 Economic Coordination Topics
+
+**`/soho/{uuid}/pricing`**
+
+*Purpose*: Node's pricing strategy and market data  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "mode": "manual|market_average|bid_only",
+  "rates": {
+    "compute": {
+      "user_rate_per_core_hour": "Float|null",
+      "network_average": "Float",
+      "municipal_average": "Float",
+      "wan_average": "Float"
+    },
+    "storage": {
+      "user_rate_per_gb_month": "Float|null",
+      "tier_rates": {
+        "tier_1": "Float",
+        "tier_2": "Float",
+        "tier_3": "Float",
+        "tier_4": "Float"
+      },
+      "network_average": "Float",
+      "municipal_average": "Float",
+      "wan_average": "Float"
+    },
+    "custom_services": [
+      {
+        "service_name": "String (e.g., 'Spanish Translation')",
+        "unit": "word|hour|job",
+        "user_rate": "Float",
+        "network_average": "Float"
+      }
+    ]
+  },
+  "minimum_bid": "Float",
+  "currency": "USD|EUR|BTC|NTARI_CREDITS",
+  "payment_methods": ["crypto", "bank_transfer", "paypal"],
+  "escrow_required": "Boolean"
+}
+```
+
+**`/soho/{uuid}/bids/outgoing`**
+
+*Purpose*: Bids this node has placed  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "bids": [
+    {
+      "bid_id": "bid-{uuid}",
+      "job_id": "job-{uuid}",
+      "amount": "Float",
+      "currency": "String",
+      "resource_type": "compute|storage|custom",
+      "resource_details": {
+        "cores": "Integer",
+        "duration_hours": "Float",
+        "gb": "Float"
+      },
+      "status": "pending|accepted|rejected|withdrawn",
+      "submitted": "Unix timestamp",
+      "expires": "Unix timestamp",
+      "escrow_locked": "Boolean"
+    }
+  ]
+}
+```
+
+**`/soho/{uuid}/offers/incoming`**
+
+*Purpose*: Offers received by this node  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "offers": [
+    {
+      "offer_id": "offer-{uuid}",
+      "from_soho": "ntari-{uuid}",
+      "job_id": "job-{uuid}",
+      "amount": "Float",
+      "currency": "String",
+      "resource_requested": {
+        "type": "compute|storage|custom",
+        "details": {}
+      },
+      "status": "pending|accepted|rejected|countered",
+      "received": "Unix timestamp",
+      "expires": "Unix timestamp"
+    }
+  ]
+}
+```
+
+**`/network/market/requests`**
+
+*Purpose*: Global job board  
+*Publish Frequency*: Real-time  
+*QoS*: Reliable, transient (1 hour retention)
+
+```json
+{
+  "timestamp": "Unix timestamp",
+  "jobs": [
+    {
+      "job_id": "job-{uuid}",
+      "posted_by": "ntari-{uuid}",
+      "title": "String (max 200 chars)",
+      "description": "String (max 2000 chars)",
+      "category": "compute|storage|manufacturing|logistics|translation|custom",
+      "requirements": {
+        "compute": {
+          "cores": "Integer",
+          "ram_gb": "Float",
+          "duration_hours": "Float",
+          "gpu_required": "Boolean"
+        },
+        "storage": {
+          "gb": "Float",
+          "tier": "1|2|3|4",
+          "duration_days": "Integer"
+        },
+        "software": ["String"],
+        "hardware": ["String"],
+        "location": {
+          "required": "Boolean",
+          "coordinates": {"lat": "Float", "lon": "Float"},
+          "radius_km": "Float"
+        }
+      },
+      "budget": {
+        "min": "Float",
+        "max": "Float",
+        "currency": "String"
+      },
+      "deadline": "Unix timestamp",
+      "bids_received": "Integer",
+      "status": "open|in_progress|completed|cancelled",
+      "escrow_required": "Boolean"
+    }
+  ]
+}
+```
+
+#### 3.1.4 Governance & Trust Topics
+
+**`/soho/{uuid}/reputation`**
+
+*Purpose*: Node reputation and history  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "lbtas_scores": {
+    "overall": "Float (0-5)",
+    "categories": {
+      "reliability": "Float (0-5)",
+      "quality": "Float (0-5)",
+      "communication": "Float (0-5)",
+      "safety": "Float (0-5)"
+    },
+    "methodology_url": "https://github.com/NTARI-RAND/Leveson-Based-Trade-Assessment-Scale"
+  },
+  "statistics": {
+    "completed_jobs": "Integer",
+    "failed_jobs": "Integer",
+    "disputes": "Integer",
+    "disputes_resolved": "Integer",
+    "member_since": "Unix timestamp",
+    "last_active": "Unix timestamp"
+  },
+  "verified_skills": ["String"],
+  "badges": [
+    {
+      "badge_id": "String",
+      "name": "reliable_steward|data_guardian|founding_member",
+      "earned": "Unix timestamp",
+      "issuer": "network|community|manual"
+    }
+  ],
+  "network_citizenship_tier": "bronze|silver|gold|platinum",
+  "tier_benefits": {
+    "priority_re_entry": "Boolean",
+    "reduced_mandatory_contribution_gb": "Float",
+    "governance_weight": "Float (vote multiplier)"
+  },
+  "graceful_exits": "Integer",
+  "exit_reliability_score": "Float (0-5)"
+}
+```
+
+**`/network/governance/proposals`**
+
+*Purpose*: Democratic proposals  
+*Publish Frequency*: Real-time  
+*QoS*: Reliable, persistent (retained until vote ends + 30 days)
+
+```json
+{
+  "timestamp": "Unix timestamp",
+  "proposals": [
+    {
+      "proposal_id": "prop-{uuid}",
+      "title": "String (max 200 chars)",
+      "description": "String (Markdown, max 10000 chars)",
+      "type": "policy_change|resource_allocation|software_upgrade|economic_parameter",
+      "scope": "global|municipal|wan|local",
+      "submitted_by": "ntari-{uuid}",
+      "submitted_at": "Unix timestamp",
+      "voting_starts": "Unix timestamp",
+      "voting_ends": "Unix timestamp",
+      "quorum_required": "Integer (number of votes)",
+      "votes": {
+        "yes": "Integer",
+        "no": "Integer",
+        "abstain": "Integer"
+      },
+      "weighted_votes": {
+        "yes": "Float",
+        "no": "Float",
+        "abstain": "Float"
+      },
+      "status": "draft|active|passed|rejected|implemented",
+      "implementation_date": "Unix timestamp (if passed)",
+      "discussion_url": "String (optional)"
+    }
+  ]
+}
+```
+
+**`/network/governance/votes`**
+
+*Purpose*: Individual node's votes  
+*Publish Frequency*: On vote  
+*QoS*: Reliable, persistent
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "votes": [
+    {
+      "proposal_id": "prop-{uuid}",
+      "vote": "yes|no|abstain",
+      "weight": "Float (based on reputation tier)",
+      "cast_at": "Unix timestamp",
+      "signature": "ed25519:{base64_signature}",
+      "comment": "String (optional, max 500 chars)"
+    }
+  ]
+}
+```
+
+#### 3.1.5 Mandatory Service Topics
+
+**`/network/storage/distributed`**
+
+*Purpose*: Distributed storage cluster status  
+*Publish Frequency*: Every 300 seconds  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "timestamp": "Unix timestamp",
+  "cluster_status": {
+    "total_capacity_gb": "Float",
+    "used_gb": "Float",
+    "utilization": "Float (0-1)",
+    "replication_factor_avg": "Float",
+    "nodes_contributing": "Integer",
+    "nodes_total": "Integer",
+    "health": "healthy|degraded|critical"
+  },
+  "by_tier": {
+    "tier_1_active_volatile_hdd": {
+      "total_gb": "Float",
+      "used_gb": "Float",
+      "nodes": "Integer"
+    },
+    "tier_2_reference_stable_ssd": {
+      "total_gb": "Float",
+      "used_gb": "Float",
+      "nodes": "Integer"
+    },
+    "tier_3_archival_cold_hdd": {
+      "total_gb": "Float",
+      "used_gb": "Float",
+      "nodes": "Integer"
+    },
+    "tier_4_hot_transactional_ssd": {
+      "total_gb": "Float",
+      "used_gb": "Float",
+      "nodes": "Integer"
+    }
+  },
+  "redundancy_status": {
+    "files_below_target_replication": "Integer",
+    "files_at_risk": "Integer",
+    "recovery_jobs_active": "Integer"
+  }
+}
+```
+
+**`/soho/{uuid}/storage/contribution`**
+
+*Purpose*: Individual node's storage contribution  
+*Publish Frequency*: Every 300 seconds  
+*QoS*: Reliable, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "contribution": {
+    "offered_gb": "Float",
+    "used_gb": "Float",
+    "stored_shards": "Integer",
+    "stored_files": "Integer",
+    "bytes_served_24h": "Integer",
+    "requests_served_24h": "Integer"
+  },
+  "earnings": {
+    "current_month": "Float",
+    "last_month": "Float",
+    "all_time": "Float",
+    "currency": "String"
+  },
+  "health": {
+    "failed_integrity_checks": "Integer",
+    "last_health_check": "Unix timestamp",
+    "status": "healthy|warning|degraded"
+  }
+}
+```
+
+**`/network/time/sync`**
+
+*Purpose*: Transaction tic blockchain consensus  
+*Publish Frequency*: Every tic interval  
+*QoS*: Reliable, persistent
+
+```json
+{
+  "current_tic": "Integer",
+  "tic_interval_seconds": "Integer (1|10|60)",
+  "tic_hash": "SHA256 hash",
+  "previous_tic_hash": "SHA256 hash",
+  "transactions_in_tic": "Integer",
+  "consensus_nodes": [
+    {
+      "soho_id": "ntari-{uuid}",
+      "signature": "ed25519:{base64_signature}",
+      "timestamp_ms": "Integer"
+    }
+  ],
+  "your_clock_offset_ms": "Integer",
+  "chain_height": "Integer",
+  "genesis_timestamp": 1704067200,
+  "merkle_root": "SHA256 hash",
+  "transactions": [
+    {
+      "tx_id": "tx-{uuid}",
+      "type": "bid|offer|vote|file_write|payment",
+      "from": "ntari-{uuid}",
+      "to": "ntari-{uuid}",
+      "data": {},
+      "signature": "ed25519:{base64_signature}"
+    }
+  ]
+}
+```
+
+**`/network/dns/local`**
+
+*Purpose*: Mesh-local name resolution  
+*Publish Frequency*: On change  
+*QoS*: Reliable, transient-local
+
+```json
+{
+  "timestamp": "Unix timestamp",
+  "records": [
+    {
+      "name": "afi.local.ntari",
+      "type": "A|AAAA|CNAME|TXT",
+      "value": "String",
+      "ttl": "Integer (seconds)",
+      "registered_by": "ntari-{uuid}",
+      "signature": "ed25519:{base64_signature}"
+    }
+  ],
+  "authority_nodes": ["ntari-{uuid}"],
+  "zone": "local.ntari|municipal.ntari|global.ntari"
+}
+```
+
+#### 3.1.6 Exit & Legacy Handoff Topics
+
+**`/soho/{uuid}/network/exit_intent`**
+
+*Purpose*: Node announces graceful exit  
+*Publish Frequency*: On announcement  
+*QoS*: Reliable, persistent
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "exit_type": "graceful|position_transfer|immediate",
+  "handoff_period_hours": "Integer (0-720)",
+  "announcement_bonus_earned": "Float",
+  "data_handoff_status": "pending|in_progress|completed",
+  "affected_resources": {
+    "storage_shards": "Integer",
+    "active_contracts": "Integer",
+    "governance_delegations": "Integer"
+  },
+  "reason": "String (optional, max 500 chars)",
+  "expected_completion": "Unix timestamp"
+}
+```
+
+**`/soho/{uuid}/network/handoff_progress`**
+
+*Purpose*: Track data handoff during exit  
+*Publish Frequency*: On change (real-time during handoff)  
+*QoS*: Reliable, volatile
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "timestamp": "Unix timestamp",
+  "handoff_progress": {
+    "shards_total": "Integer",
+    "shards_transferred": "Integer",
+    "shards_verified": "Integer",
+    "bytes_transferred": "Integer",
+    "bytes_total": "Integer",
+    "completion_percentage": "Float (0-100)"
+  },
+  "recipient_nodes": [
+    {
+      "soho_id": "ntari-{uuid}",
+      "shards_received": "Integer",
+      "verification_complete": "Boolean"
+    }
+  ],
+  "estimated_completion": "Unix timestamp",
+  "bonuses": {
+    "completion_bonus": "Float",
+    "time_bonus": "Float",
+    "verification_bonus": "Float",
+    "total_exit_reward": "Float"
+  }
+}
+```
+
+**`/network/market/position_transfers`**
+
+*Purpose*: Market for selling node positions  
+*Publish Frequency*: Real-time  
+*QoS*: Reliable, transient (30 days)
+
+```json
+{
+  "timestamp": "Unix timestamp",
+  "transfers": [
+    {
+      "transfer_id": "xfer-{uuid}",
+      "seller": "ntari-{uuid}",
+      "position": {
+        "storage_contributed_gb": "Float",
+        "compute_contributed_cores": "Float",
+        "monthly_income": "Float",
+        "currency": "String",
+        "reputation_score": "Float",
+        "contract_obligations": "String",
+        "obligations_expire": "Unix timestamp"
+      },
+      "asking_price": "Float",
+      "currency": "String",
+      "bids": [
+        {
+          "buyer": "ntari-{uuid}",
+          "offer": "Float",
+          "submitted": "Unix timestamp",
+          "status": "pending|accepted|rejected"
+        }
+      ],
+      "status": "open|pending_transfer|completed|cancelled",
+      "posted": "Unix timestamp",
+      "expires": "Unix timestamp"
+    }
+  ]
+}
+```
+
+---
+
+## 4. Storage Infrastructure
+
+### 4.1 Tiered Storage Strategy
+
+#### 4.1.1 Storage Tier Definitions
+
+**Tier 1: Active/Volatile → HDD**
+
+*Purpose*: Frequently modified files  
+*Media*: HDD (hard disk drives)  
+*Redundancy*: Replication (3x)  
+*Write Pattern*: > 10 writes/day
+
+```yaml
+tier_1:
+  name: "Active/Volatile"
+  media: HDD
+  redundancy:
+    method: replication
+    factor: 3
+    distribution: geographic
+  criteria:
+    write_frequency: "> 10 writes/day"
+    file_churn: high
+    access_pattern: random_write
+  pricing:
+    rate_per_gb_month: 0.012
+    currency: USD
+  use_cases:
+    - Collaborative documents
+    - Active databases
+    - User profiles
+    - Session data
+    - Development files
+```
+
+**Tier 2: Reference/Stable → SSD**
+
+*Purpose*: Write-once, read-occasionally  
+*Media*: SSD (solid state drives)  
+*Redundancy*: Erasure coding (6+2)  
+*Write Pattern*: < 1 write/month
+
+```yaml
+tier_2:
+  name: "Reference/Stable"
+  media: SSD
+  redundancy:
+    method: erasure_coding
+    scheme: "6+2"
+    overhead: 1.33
+  criteria:
+    write_frequency: "< 1 write/month"
+    file_churn: low
+    access_pattern: occasional_read
+  pricing:
+    rate_per_gb_month: 0.020
+    currency: USD
+  use_cases:
+    - Blockchain/tic chain
+    - Published articles
+    - Completed projects
+    - Photo galleries
+    - Software releases
+    - Legal records
+```
+
+**Tier 3: Archival/Cold → HDD**
+
+*Purpose*: Long-term storage, rarely accessed  
+*Media*: HDD  
+*Redundancy*: Erasure coding (20+10)  
+*Write Pattern*: Write-once (immutable)
+
+```yaml
+tier_3:
+  name: "Archival/Cold"
+  media: HDD
+  redundancy:
+    method: erasure_coding
+    scheme: "20+10"
+    overhead: 1.5
+  criteria:
+    write_frequency: "0 (write-once)"
+    access_frequency: "< 1 read/month"
+    file_size: "> 1 GB"
+  pricing:
+    rate_per_gb_month: 0.008
+    currency: USD
+  power_management:
+    spin_down_idle: true
+    spin_down_delay_seconds: 600
+  use_cases:
+    - Video archives
+    - Historical datasets
+    - Backup snapshots
+    - Multi-year sensor logs
+```
+
+**Tier 4: Hot/Transactional → SSD**
+
+*Purpose*: High-frequency access, low-latency  
+*Media*: SSD  
+*Redundancy*: Replication (3x, geo-distributed)  
+*Write Pattern*: > 100 writes/day
+
+```yaml
+tier_4:
+  name: "Hot/Transactional"
+  media: SSD
+  redundancy:
+    method: replication
+    factor: 3
+    distribution: geographic
+    latency_target_ms: 50
+  criteria:
+    write_frequency: "> 100 writes/day"
+    access_frequency: "> 100 reads/day"
+    latency_requirement: "< 50ms"
+    file_size: "< 1 MB"
+  pricing:
+    rate_per_gb_month: 0.025
+    currency: USD
+  use_cases:
+    - Market order books
+    - Mesh routing tables
+    - Real-time sensor aggregation
+    - Drone coordination state
+```
+
+#### 4.1.2 Automatic Tier Migration
+
+**Migration State Machine:**
+
+```
+New File Upload
+  ↓
+Tier 1 (HDD, Active/Volatile)
+  ↓
+Monitor for 30 days
+  ↓
+< 10 writes in 30 days?
+  ↓ yes
+Mark "Stabilizing"
+  ↓
+No writes for 90 days?
+  ↓ yes
+Migrate to Tier 2 (SSD, Reference/Stable)
+  ↓
+Monitor for 6 months
+  ↓
+< 1 read/month?
+  ↓ yes
+Migrate to Tier 3 (HDD, Archival/Cold)
+```
+
+**Migration Configuration:**
+
+```yaml
+# /etc/ntari/storage-migration.yaml
+auto_migration:
+  enabled: true
+  evaluation_period_days: 30
+  stabilization_threshold_days: 90
+  archival_threshold_days: 180
+  
+tier_transitions:
+  - from: tier_1
+    to: tier_2
+    conditions:
+      - writes_in_period: "< 10"
+      - period_days: 30
+      - days_since_last_write: "> 90"
+    
+  - from: tier_2
+    to: tier_3
+    conditions:
+      - reads_in_period: "< 5"
+      - period_days: 180
+      - file_size: "> 100 MB"
+      
+  - from: tier_3
+    to: tier_2
+    conditions:
+      - reads_in_period: "> 20"
+      - period_days: 30
+      
+user_overrides:
+  enabled: true
+  paths:
+    "/home/user/photos/*": tier_2  # Keep on SSD
+    "/home/user/backups/*": tier_3  # Force archival
+```
+
+#### 4.1.3 Erasure Coding Schemes
+
+**Reed-Solomon Implementation:**
+
+```python
+# Erasure coding parameters
+SCHEMES = {
+    "light": {
+        "data_shards": 6,
+        "parity_shards": 2,
+        "overhead": 1.33,
+        "fault_tolerance": 2
+    },
+    "medium": {
+        "data_shards": 8,
+        "parity_shards": 4,
+        "overhead": 1.5,
+        "fault_tolerance": 4
+    },
+    "heavy": {
+        "data_shards": 20,
+        "parity_shards": 10,
+        "overhead": 1.5,
+        "fault_tolerance": 10
+    }
+}
+```
+
+**Shard Distribution Algorithm:**
+
+```python
+def distribute_shards(file_shards, node_list):
+    """
+    Distribute shards ensuring:
+    1. No two shards of same file on same node
+    2. Geographic diversity for data shards
+    3. Proximity for parity shards (faster reconstruction)
+    """
+    data_shards = file_shards[:data_shard_count]
+    parity_shards = file_shards[data_shard_count:]
+    
+    # Sort nodes by distance from file owner
+    nodes_sorted = sort_by_distance(node_list, owner_location)
+    
+    # Place data shards geographically distributed
+    data_nodes = select_diverse_nodes(nodes_sorted, len(data_shards))
+    
+    # Place parity shards on nearby high-compute nodes
+    parity_nodes = select_compute_nodes(nodes_sorted, len(parity_shards))
+    
+    return zip(file_shards, data_nodes + parity_nodes)
+```
+
+**Reconstruction Process:**
+
+```python
+def reconstruct_shard(file_id, missing_shard_index):
+    """
+    Reconstruct a missing shard using Reed-Solomon math
+    """
+    # 1. Identify file's shard configuration
+    config = get_file_config(file_id)
+    scheme = SCHEMES[config.erasure_scheme]
+    
+    # 2. Gather available shards
+    available = fetch_available_shards(file_id)
+    
+    # 3. Need at least data_shard_count to reconstruct
+    if len(available) < scheme["data_shards"]:
+        raise InsufficientShards(
+            f"Need {scheme['data_shards']}, have {len(available)}"
+        )
+    
+    # 4. Perform Reed-Solomon reconstruction
+    reconstructed = reed_solomon_decode(available, missing_shard_index)
+    
+    # 5. Verify hash
+    if hash(reconstructed) != get_shard_hash(file_id, missing_shard_index):
+        raise IntegrityError("Reconstructed shard hash mismatch")
+    
+    # 6. Store reconstructed shard
+    new_node = select_storage_node()
+    store_shard(new_node, file_id, missing_shard_index, reconstructed)
+    
+    return new_node
+```
+
+### 4.2 Storage Daemon Architecture
+
+**Component Overview:**
+
+```
+ntari-storage-daemon
+├── tier-manager       # Tier assignment and migration
+├── shard-distributor  # Shard placement algorithm
+├── health-monitor     # SMART monitoring, integrity checks
+├── reconstructor      # Erasure code reconstruction
+├── replicator         # Replication for non-erasure tiers
+└── economics          # Pricing, payments, accounting
+```
+
+**Service Configuration:**
+
+```ini
+# /etc/ntari/storage-daemon.conf
+[daemon]
+pid_file = /var/run/ntari/storage-daemon.pid
+log_file = /var/log/ntari/storage-daemon.log
+log_level = info
+
+[storage]
+base_path = /var/lib/ntari/storage
+mandatory_contribution_gb = 1.0
+max_contribution_gb = 1000.0
+
+[tiers]
+tier_1_enabled = true
+tier_2_enabled = true
+tier_3_enabled = true
+tier_4_enabled = true
+
+[health]
+smart_check_interval_seconds = 3600
+integrity_check_interval_seconds = 86400
+failed_check_threshold = 3
+
+[reconstruction]
+max_concurrent_jobs = 2
+priority_queue_size = 100
+cpu_limit_percent = 25
+
+[economics]
+enable_payments = true
+currency = USD
+payment_interval_seconds = 2592000  # Monthly
+```
+
+### 4.3 Storage API
+
+**File Upload:**
+
+```bash
+ntari storage upload /path/to/file.pdf \
+  --tier auto \
+  --replication 3 \
+  --encryption aes256
+```
+
+```python
+# Python API
+from ntari.storage import StorageClient
+
+client = StorageClient()
+file_id = client.upload(
+    path="/path/to/file.pdf",
+    tier="auto",  # or 1, 2, 3, 4
+    replication=3,
+    encryption="aes256",
+    metadata={
+        "title": "Q4 Report",
+        "tags": ["finance", "quarterly"]
+    }
+)
+```
+
+**File Download:**
+
+```bash
+ntari storage download file-{uuid} /path/to/destination/
+```
+
+```python
+client.download(
+    file_id="file-{uuid}",
+    destination="/path/to/destination/",
+    verify_integrity=True
+)
+```
+
+**File Metadata:**
+
+```bash
+ntari storage info file-{uuid}
+```
+
+```json
+{
+  "file_id": "file-{uuid}",
+  "filename": "Q4_report.pdf",
+  "size_bytes": 2048000,
+  "tier": 2,
+  "redundancy": {
+    "method": "erasure_coding",
+    "scheme": "6+2",
+    "shards": 8
+  },
+  "locations": [
+    {"soho_id": "ntari-a1b2", "shard": 0},
+    {"soho_id": "ntari-c3d4", "shard": 1}
+  ],
+  "created": 1704067200,
+  "last_accessed": 1739577600,
+  "last_modified": 1704067200,
+  "hash": "sha256:{hash}",
+  "encryption": "aes256",
+  "owner": "ntari-e5f6"
+}
+```
+
+### 4.4 SMART Monitoring & Health Management
+
+**Health Check Daemon:**
+
+```python
+# /opt/ntari/storage/health_monitor.py
+
+class HealthMonitor:
+    def __init__(self):
+        self.check_interval = 3600  # 1 hour
+        self.drives = self.detect_drives()
+        
+    def monitor_loop(self):
+        while True:
+            for drive in self.drives:
+                health = self.check_smart(drive)
+                
+                if health.status == "warning":
+                    self.reduce_tier_allocation(drive)
+                    self.notify_user(drive, health)
+                    
+                elif health.status == "failing":
+                    self.migrate_all_data(drive)
+                    self.disable_drive(drive)
+                    self.alert_user_urgent(drive, health)
+                    
+                self.publish_health_status(drive, health)
+                
+            time.sleep(self.check_interval)
+    
+    def check_smart(self, drive):
+        """Read SMART data and assess health"""
+        smart = subprocess.run(
+            ["smartctl", "-A", drive.device],
+            capture_output=True
+        )
+        
+        return {
+            "device": drive.device,
+            "status": self.assess_status(smart.stdout),
+            "power_on_hours": self.extract_value(smart, "Power_On_Hours"),
+            "reallocated_sectors": self.extract_value(smart, "Reallocated_Sector_Ct"),
+            "wear_level": self.extract_value(smart, "Wear_Leveling_Count") if drive.type == "SSD" else None,
+            "temperature": self.extract_value(smart, "Temperature_Celsius")
+        }
+```
+
+**Tier Rebalancing on Drive Degradation:**
+
+```python
+def reduce_tier_allocation(self, drive):
+    """
+    When drive shows warning signs:
+    1. Stop accepting new writes
+    2. Reduce tier assignments
+    3. Prefer read-only tiers
+    """
+    if drive.type == "SSD" and drive.wear_level > 80:
+        # Move from write-heavy to read-only tiers
+        self.migrate_tier(drive, from_tier=4, to_tier=2)
+        self.migrate_tier(drive, from_tier=1, to_tier=2)
+        
+    elif drive.type == "HDD" and drive.reallocated_sectors > 10:
+        # Reduce load on failing HDD
+        self.reduce_allocation(drive, by_percent=50)
+```
+
+---
+
+## 5. Economic Coordination System
+
+### 5.1 SoHoLINK Architecture
+
+**Core Components:**
+
+```
+SoHoLINK
+├── Resource Broker
+│   ├── Job matching engine
+│   ├── Bid/offer processor
+│   └── Contract manager
+├── Agent Profile Manager
+│   ├── Skills database
+│   ├── Schedule manager
+│   └── Portfolio tracker
+├── Payment Processor
+│   ├── Multi-currency support
+│   ├── Escrow service
+│   └── Transaction logger
+└── Reputation Engine
+    ├── LBTAS calculator
+    ├── Dispute resolution
+    └── Badge system
+```
+
+### 5.2 Resource Broker
+
+**Job Matching Algorithm:**
+
+```python
+class ResourceBroker:
+    def match_job_to_nodes(self, job):
+        """
+        Match job requirements to available nodes
+        Returns ranked list of suitable nodes
+        """
+        # 1. Filter by hard requirements
+        candidates = self.filter_by_requirements(job)
+        
+        # 2. Score candidates
+        scored = []
+        for node in candidates:
+            score = self.calculate_match_score(job, node)
+            scored.append((node, score))
+        
+        # 3. Sort by score descending
+        scored.sort(key=lambda x: x[1], reverse=True)
+        
+        # 4. Return top N candidates
+        return scored[:10]
+    
+    def calculate_match_score(self, job, node):
+        """
+        Scoring factors:
+        - Capability match (0-40 points)
+        - Reputation (0-25 points)
+        - Price competitiveness (0-20 points)
+        - Proximity (0-10 points)
+        - Availability (0-5 points)
+        """
+        score = 0
+        
+        # Capability match
+        if job.requirements.compute:
+            if node.resources.compute.cores >= job.requirements.compute.cores:
+                score += 20
+            if node.resources.compute.ram_gb >= job.requirements.compute.ram_gb:
+                score += 20
+        
+        # Reputation
+        score += node.reputation.overall * 5  # 0-5 rating * 5 = 0-25 points
+        
+        # Price
+        if job.budget:
+            node_bid = node.pricing.estimate_bid(job)
+            if node_bid <= job.budget.max:
+                price_ratio = node_bid / job.budget.max
+                score += (1 - price_ratio) * 20  # Lower price = higher score
+        
+        # Proximity (if location matters)
+        if job.requirements.location:
+            distance_km = calculate_distance(
+                job.requirements.location.coordinates,
+                node.profile.location.coordinates
+            )
+            if distance_km <= job.requirements.location.radius_km:
+                score += 10 * (1 - distance_km / job.requirements.location.radius_km)
+        
+        # Availability
+        if node.schedule.available_now:
+            score += 5
+        
+        return score
+```
+
+**Bid Processing:**
+
+```python
+class BidProcessor:
+    def submit_bid(self, soho_id, job_id, amount, details):
+        """Submit a bid to a job"""
+        bid = {
+            "bid_id": generate_uuid(),
+            "job_id": job_id,
+            "from_soho": soho_id,
+            "amount": amount,
+            "currency": details.get("currency", "USD"),
+            "resource_details": details.get("resources"),
+            "submitted": int(time.time()),
+            "expires": int(time.time()) + 86400,  # 24 hours
+            "status": "pending"
+        }
+        
+        # Publish to DDS
+        self.dds.publish(f"/soho/{soho_id}/bids/outgoing", bid)
+        
+        # Notify job poster
+        job = self.get_job(job_id)
+        self.notify_node(job.posted_by, "new_bid", bid)
+        
+        return bid
+    
+    def accept_bid(self, job_id, bid_id):
+        """Job poster accepts a bid"""
+        bid = self.get_bid(bid_id)
+        job = self.get_job(job_id)
+        
+        # Create contract
+        contract = self.create_contract(job, bid)
+        
+        # If escrow required, lock funds
+        if job.escrow_required:
+            self.escrow.lock_funds(
+                from_soho=job.posted_by,
+                amount=bid.amount,
+                contract_id=contract.contract_id
+            )
+        
+        # Update bid status
+        bid.status = "accepted"
+        self.dds.publish(f"/soho/{bid.from_soho}/bids/outgoing", bid)
+        
+        # Update job status
+        job.status = "in_progress"
+        job.assigned_to = bid.from_soho
+        self.dds.publish("/network/market/requests", job)
+        
+        # Notify both parties
+        self.notify_node(bid.from_soho, "bid_accepted", contract)
+        self.notify_node(job.posted_by, "contract_created", contract)
+        
+        return contract
+```
+
+### 5.3 Agent Profile Manager
+
+**Profile Schema:**
+
+```json
+{
+  "soho_id": "ntari-{uuid}",
+  "agent": {
+    "display_name": "String",
+    "bio": "String",
+    "skills": [
+      {
+        "skill_name": "String",
+        "proficiency": "beginner|intermediate|expert",
+        "verified": "Boolean",
+        "verified_by": "ntari-{uuid}|network",
+        "years_experience": "Integer"
+      }
+    ],
+    "education": [
+      {
+        "degree": "String",
+        "institution": "String",
+        "year": "Integer",
+        "verified": "Boolean"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "String",
+        "issuer": "String",
+        "issued": "Unix timestamp",
+        "expires": "Unix timestamp",
+        "credential_url": "String"
+      }
+    ],
+    "languages": [
+      {
+        "language": "ISO 639-1",
+        "proficiency": "basic|conversational|fluent|native"
+      }
+    ],
+    "portfolio": [
+      {
+        "title": "String",
+        "description": "String",
+        "url": "String",
+        "completed": "Unix timestamp",
+        "client_soho": "ntari-{uuid}",
+        "testimonial": "String"
+      }
+    ]
+  },
+  "schedule": {
+    "timezone": "IANA timezone",
+    "availability": {
+      "monday": [{"start": "09:00", "end": "17:00"}],
+      "tuesday": [{"start": "09:00", "end": "17:00"}],
+      // ... other days
+    },
+    "exceptions": [
+      {
+        "date": "YYYY-MM-DD",
+        "available": "Boolean",
+        "hours": [{"start": "HH:MM", "end": "HH:MM"}]
+      }
+    ],
+    "max_concurrent_jobs": "Integer",
+    "current_load": "Integer",
+    "accepting_jobs": "Boolean"
+  },
+  "seeking": {
+    "job_types": ["String"],
+    "skills_to_learn": ["String"],
+    "collaboration_interests": ["String"]
+  }
+}
+```
+
+**Schedule Management:**
+
+```python
+class ScheduleManager:
+    def check_availability(self, soho_id, required_hours, deadline):
+        """
+        Check if node can accommodate job within deadline
+        """
+        agent = self.get_agent_profile(soho_id)
+        schedule = agent.schedule
+        
+        # Get available hours between now and deadline
+        available_slots = self.get_available_slots(
+            schedule,
+            start=int(time.time()),
+            end=deadline
+        )
+        
+        total_available = sum(slot.duration_hours for slot in available_slots)
+        
+        return {
+            "can_accommodate": total_available >= required_hours,
+            "total_available_hours": total_available,
+            "suggested_slots": available_slots[:3],  # Top 3 suggestions
+            "current_load": schedule.current_load,
+            "max_load": schedule.max_concurrent_jobs
+        }
+    
+    def reserve_time(self, soho_id, contract_id, hours):
+        """Reserve time for accepted contract"""
+        agent = self.get_agent_profile(soho_id)
+        
+        agent.schedule.current_load += 1
+        agent.schedule.reservations.append({
+            "contract_id": contract_id,
+            "hours_reserved": hours,
+            "reserved_at": int(time.time())
+        })
+        
+        if agent.schedule.current_load >= agent.schedule.max_concurrent_jobs:
+            agent.schedule.accepting_jobs = False
+        
+        self.publish_profile_update(soho_id, agent)
+```
+
+### 5.4 Payment Processor
+
+**Multi-Currency Support:**
+
+```python
+class PaymentProcessor:
+    SUPPORTED_CURRENCIES = ["USD", "EUR", "BTC", "ETH", "NTARI_CREDITS"]
+    
+    def process_payment(self, contract_id):
+        """
+        Process payment for completed contract
+        """
+        contract = self.get_contract(contract_id)
+        
+        # Verify completion
+        if contract.status != "completed":
+            raise PaymentError("Contract not completed")
+        
+        # Release escrow or direct payment
+        if contract.escrow_locked:
+            self.escrow.release(
+                contract_id=contract_id,
+                to_soho=contract.worker_soho,
+                amount=contract.amount,
+                currency=contract.currency
+            )
+        else:
+            self.direct_payment(
+                from_soho=contract.client_soho,
+                to_soho=contract.worker_soho,
+                amount=contract.amount,
+                currency=contract.currency
+            )
+        
+        # Record transaction in tic
+        self.record_transaction(contract)
+        
+        # Update earnings
+        self.update_earnings(contract.worker_soho, contract.amount)
+        
+        return {
+            "payment_id": generate_uuid(),
+            "contract_id": contract_id,
+            "amount": contract.amount,
+            "currency": contract.currency,
+            "processed": int(time.time())
+        }
+```
+
+**Escrow Service:**
+
+```python
+class EscrowService:
+    def lock_funds(self, from_soho, amount, contract_id):
+        """Lock funds in escrow"""
+        escrow = {
+            "escrow_id": generate_uuid(),
+            "contract_id": contract_id,
+            "from_soho": from_soho,
+            "amount": amount,
+            "locked_at": int(time.time()),
+            "status": "locked",
+            "release_conditions": {
+                "contract_completion": True,
+                "mutual_agreement": True,
+                "dispute_resolution": True
+            }
+        }
+        
+        # Deduct from sender's balance
+        self.deduct_balance(from_soho, amount)
+        
+        # Store in escrow account
+        self.escrow_store[escrow.escrow_id] = escrow
+        
+        return escrow
+    
+    def release(self, contract_id, to_soho, amount, currency):
+        """Release escrowed funds"""
+        escrow = self.get_escrow_by_contract(contract_id)
+        
+        if escrow.status != "locked":
+            raise EscrowError("Funds not locked")
+        
+        # Transfer to recipient
+        self.add_balance(to_soho, amount, currency)
+        
+        # Mark escrow released
+        escrow.status = "released"
+        escrow.released_at = int(time.time())
+        escrow.released_to = to_soho
+        
+        return escrow
+```
+
+### 5.5 Reputation Engine (LBTAS)
+
+**Leveson-Based Trade Assessment Scale**
+
+NTARI OS implements the Leveson-Based Trade Assessment Scale (LBTAS), a reputation system based on Nancy Leveson's aircraft software assessment methodology. Unlike conventional 5-star ratings, LBTAS provides a sophisticated 6-point scale (-1 to +4) that enables precise, actionable feedback for continuous improvement.
+
+**Repository**: https://github.com/NTARI-RAND/Leveson-Based-Trade-Assessment-Scale
+
+#### 5.5.1 The 6-Point Scale (-1 to +4)
+
+```
+-1: No Trust
+    User was harmed, exploited, or received product/service with
+    evidence of no discipline or malicious intent
+    
+ 0: Cynical Satisfaction
+    Interaction fulfills basic promise requiring little discipline
+    toward user satisfaction
+    
+ 1: Basic Promise
+    Interaction meets all articulated user demands, no more
+    
+ 2: Basic Satisfaction
+    Interaction meets socially acceptable standards exceeding
+    articulated demands
+    
+ 3: No Negative Consequences
+    Interaction designed to prevent loss, exceed basic quality
+    
+ 4: Delight
+    Interaction anticipates evolution of user practices and
+    concerns post-transaction
+```
+
+#### 5.5.2 Assessment Criteria
+
+**Four Standardized Dimensions**:
+
+1. **Reliability**: Consistency and dependability of service delivery
+   - On-time completion rate
+   - System uptime and availability
+   - Commitment adherence
+
+2. **Usability**: Interface quality, communication effectiveness, ease of interaction
+   - Response time to communications
+   - Message clarity and professionalism
+   - Ease of collaboration
+
+3. **Performance**: Speed, efficiency, technical capability demonstration
+   - Delivery speed vs. deadline
+   - Quality of work output
+   - Technical competence
+
+4. **Support**: Problem resolution, customer service, ongoing assistance quality
+   - Issue responsiveness
+   - Proactive problem-solving
+   - Post-delivery follow-up
+
+#### 5.5.3 LBTAS Implementation
+
+```python
+# lbtas_ntari.py
+
+from enum import IntEnum
+import time
+
+class LBTASRating(IntEnum):
+    """Leveson-Based Trade Assessment Scale"""
+    NO_TRUST = -1              # Harm, exploitation, malicious
+    CYNICAL_SATISFACTION = 0   # Basic promise, minimal effort
+    BASIC_PROMISE = 1          # Meets demands, no more
+    BASIC_SATISFACTION = 2     # Exceeds demands, acceptable
+    NO_NEGATIVE = 3            # Prevents loss, exceeds quality
+    DELIGHT = 4                # Anticipates future needs
+
+class LBTASCriteria:
+    """Four assessment criteria"""
+    RELIABILITY = "reliability"
+    USABILITY = "usability"
+    PERFORMANCE = "performance"
+    SUPPORT = "support"
+
+class LBTASAssessment:
+    """NTARI's LBTAS integration"""
+    
+    def __init__(self, node_id: str):
+        self.node_id = node_id
+        self.ratings = {
+            LBTASCriteria.RELIABILITY: [],
+            LBTASCriteria.USABILITY: [],
+            LBTASCriteria.PERFORMANCE: [],
+            LBTASCriteria.SUPPORT: []
+        }
+    
+    def add_rating(self, criterion: str, rating: int, 
+                   rater_id: str, comment: str = ""):
+        """Add rating (validates -1 to 4 range)"""
+        if rating < -1 or rating > 4:
+            raise ValueError(
+                f"LBTAS rating must be -1 to 4, got {rating}"
+            )
+        
+        self.ratings[criterion].append({
+            "rating": rating,
+            "rater": rater_id,
+            "comment": comment,
+            "timestamp": int(time.time())
+        })
+        
+        self.publish_rating_update()
+    
+    def get_average(self, criterion: str) -> float:
+        """Calculate average for criterion"""
+        if not self.ratings[criterion]:
+            return 0.0
+        
+        total = sum(r["rating"] for r in self.ratings[criterion])
+        return total / len(self.ratings[criterion])
+    
+    def get_overall_average(self) -> float:
+        """Overall LBTAS score (all four criteria)"""
+        averages = [
+            self.get_average(LBTASCriteria.RELIABILITY),
+            self.get_average(LBTASCriteria.USABILITY),
+            self.get_average(LBTASCriteria.PERFORMANCE),
+            self.get_average(LBTASCriteria.SUPPORT)
+        ]
+        
+        return sum(averages) / len(averages) if averages else 0.0
+    
+    def get_rating_distribution(self) -> dict:
+        """Distribution across 6-point scale"""
+        all_ratings = []
+        for criterion_ratings in self.ratings.values():
+            all_ratings.extend([r["rating"] for r in criterion_ratings])
+        
+        if not all_ratings:
+            return {}
+        
+        distribution = {-1: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+        for rating in all_ratings:
+            distribution[rating] += 1
+        
+        total = len(all_ratings)
+        return {
+            rating: {
+                "count": count,
+                "percentage": (count / total) * 100
+            }
+            for rating, count in distribution.items()
+        }
+    
+    def determine_tier(self) -> str:
+        """Network citizenship tier"""
+        overall = self.get_overall_average()
+        
+        if overall >= 3.5:
+            return "Platinum"
+        elif overall >= 3.0:
+            return "Gold"
+        elif overall >= 2.5:
+            return "Silver"
+        elif overall >= 2.0:
+            return "Bronze"
+        else:
+            return "Provisional"
+    
+    def get_governance_weight(self) -> float:
+        """Voting weight based on tier"""
+        tier = self.determine_tier()
+        weights = {
+            "Platinum": 1.5,
+            "Gold": 1.3,
+            "Silver": 1.1,
+            "Bronze": 1.0,
+            "Provisional": 0.5
+        }
+        return weights[tier]
+    
+    def publish_rating_update(self):
+        """Publish to DDS network"""
+        message = {
+            "soho_id": self.node_id,
+            "timestamp": int(time.time()),
+            "lbtas_assessment": {
+                "overall": round(self.get_overall_average(), 2),
+                "criteria": {
+                    "reliability": round(self.get_average(LBTASCriteria.RELIABILITY), 2),
+                    "usability": round(self.get_average(LBTASCriteria.USABILITY), 2),
+                    "performance": round(self.get_average(LBTASCriteria.PERFORMANCE), 2),
+                    "support": round(self.get_average(LBTASCriteria.SUPPORT), 2)
+                },
+                "scale": "Leveson -1 to +4",
+                "methodology_url": "https://github.com/NTARI-RAND/Leveson-Based-Trade-Assessment-Scale"
+            },
+            "statistics": {
+                "total_ratings": sum(len(r) for r in self.ratings.values()),
+                "distribution": self.get_rating_distribution()
+            },
+            "tier": self.determine_tier(),
+            "governance_weight": self.get_governance_weight()
+        }
+        
+        dds.publish(f"/soho/{self.node_id}/reputation", message)
+```
+
+#### 5.5.4 Rating Collection Interface
+
+**Post-Job Assessment Form**:
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║ Rate Completed Job: Translation Service                           ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║ Worker: afi.local.ntari                                           ║
+║ Job: "Translate product description EN→ES"                        ║
+║                                                                   ║
+║ ┌─────────────────────────────────────────────────────────────┐   ║
+║ │ Reliability (Consistency and dependability)                 │   ║
+║ │                                                             │   ║
+║ │ [ ] -1  No Trust - Was harmed or exploited                  │   ║
+║ │ [ ]  0  Cynical - Basic promise, minimal effort             │   ║
+║ │ [ ]  1  Basic Promise - Met demands, nothing more           │   ║
+║ │ [ ]  2  Basic Satisfaction - Exceeded demands               │   ║
+║ │ [ ]  3  No Negative - Prevented loss, exceeded quality      │   ║
+║ │ [●]  4  Delight - Anticipated my future needs               │   ║
+║ └─────────────────────────────────────────────────────────────┘   ║
+║                                                                   ║
+║ [Usability, Performance, Support use same 6-point scale]          ║
+║                                                                   ║
+║ Comments (optional): [Perfect work, delivered early...]           ║
+║                                                                   ║
+║ Overall Average: 3.75 / 4.0 (Excellent)                           ║
+║                                                                   ║
+║ [Submit Rating] [Cancel]                                          ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+#### 5.5.5 LBTAS Display
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║ LBTAS Assessment: 3.2 / 4.0 (Gold Tier 🏅)                       ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║ Reliability:    ████████░ 3.4   Usability:   ███████░░ 3.1       ║
+║ Performance:    ███████░░ 3.0   Support:     ████████░ 3.3       ║
+║                                                                   ║
+║ Scale: -1 (No Trust) to 4 (Delight) • Based on 127 completed jobs║
+║                                                                   ║
+║ Rating Distribution:                                              ║
+║  4 (Delight):           ████████████░ 67 ratings (53%)            ║
+║  3 (No Negative):       ████████░░░░░ 42 ratings (33%)            ║
+║  2 (Basic Satisfaction): ██░░░░░░░░░░ 13 ratings (10%)            ║
+║  1 (Basic Promise):      █░░░░░░░░░░░  4 ratings (3%)             ║
+║  0 (Cynical):           ░░░░░░░░░░░░  1 rating  (1%)             ║
+║ -1 (No Trust):          ░░░░░░░░░░░░  0 ratings (0%)             ║
+║                                                                   ║
+║ Methodology: https://github.com/NTARI-RAND/LBTAS                 ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+**Badge System:**
+
+```python
+BADGES = {
+    "founding_member": {
+        "name": "Founding Member",
+        "description": "Joined network in first year",
+        "icon": "🌱"
+    },
+    "reliable_steward": {
+        "name": "Reliable Steward",
+        "description": "3+ graceful exits with perfect handoff",
+        "icon": "🤝"
+    },
+    "data_guardian": {
+        "name": "Data Guardian",
+        "description": "100% shard verification, 100+ shards stored",
+        "icon": "🛡️"
+    },
+    "network_builder": {
+        "name": "Network Builder",
+        "description": "Referred 10+ active nodes",
+        "icon": "🌐"
+    },
+    "quality_provider": {
+        "name": "Quality Provider",
+        "description": "3.5+ quality rating, 50+ jobs",
+        "icon": "⭐"
+    }
+}
+```
+
+---
+
+## 6. Exit & Legacy Handoff Protocol
+
+### 6.1 Exit Types
+
+**Graceful Exit:**
+- Node announces exit with advance notice (1-30 days)
+- Data handed off to recipient nodes
+- Eligible for exit bonuses
+
+**Position Transfer:**
+- Node sells position to another node
+- All resources, reputation, contracts transferred
+- Market-determined price
+
+**Immediate Exit:**
+- Node stops without handoff
+- Network triggers emergency replication
+- No bonuses, no penalties
+
+### 6.2 Graceful Exit Flow
+
+**State Machine:**
+
+```
+1. OPERATING
+   ↓ (user initiates exit)
+2. EXIT_ANNOUNCED
+   ↓ (announcement bonus paid)
+3. HANDOFF_IN_PROGRESS
+   ↓ (shards transferring)
+4. VERIFICATION
+   ↓ (recipients verify shards)
+5. HANDOFF_COMPLETE
+   ↓ (completion bonus paid)
+6. EXITED
+```
+
+**Implementation:**
+
+```python
+class ExitManager:
+    def initiate_graceful_exit(self, soho_id, handoff_period_hours):
+        """
+        User initiates graceful exit
+        """
+        node = self.get_node(soho_id)
+        
+        # Calculate announcement bonus
+        max_bonus = 2.50
+        bonus_multiplier = min(handoff_period_hours / 168, 1.0)  # 7 days = 100%
+        announcement_bonus = max_bonus * bonus_multiplier
+        
+        # Create exit record
+        exit_record = {
+            "soho_id": soho_id,
+            "exit_type": "graceful",
+            "announced_at": int(time.time()),
+            "handoff_period_hours": handoff_period_hours,
+            "expected_completion": int(time.time()) + handoff_period_hours * 3600,
+            "announcement_bonus": announcement_bonus,
+            "status": "announced",
+            "affected_resources": {
+                "storage_shards": len(node.storage.stored_shards),
+                "active_contracts": len(node.contracts.active),
+                "governance_delegations": len(node.governance.delegations)
+            }
+        }
+        
+        # Publish exit intent
+        self.dds.publish(
+            f"/soho/{soho_id}/network/exit_intent",
+            exit_record
+        )
+        
+        # Pay announcement bonus immediately
+        self.payment.process_exit_bonus(
+            soho_id=soho_id,
+            amount=announcement_bonus,
+            bonus_type="announcement"
+        )
+        
+        # Begin handoff orchestration
+        self.orchestrate_handoff(exit_record)
+        
+        return exit_record
+    
+    def orchestrate_handoff(self, exit_record):
+        """
+        Coordinate shard transfer to recipient nodes
+        """
+        soho_id = exit_record.soho_id
+        shards = self.get_node_shards(soho_id)
+        
+        # Select recipient nodes
+        recipients = self.select_recipients(
+            shard_count=len(shards),
+            exclude=[soho_id]
+        )
+        
+        # Create transfer plan
+        transfer_plan = []
+        for shard, recipient in zip(shards, recipients):
+            transfer_plan.append({
+                "shard_id": shard.shard_id,
+                "file_id": shard.file_id,
+                "from_soho": soho_id,
+                "to_soho": recipient.soho_id,
+                "size_bytes": shard.size_bytes,
+                "priority": self.calculate_priority(shard)
+            })
+        
+        # Sort by priority (critical files first)
+        transfer_plan.sort(key=lambda x: x["priority"], reverse=True)
+        
+        # Execute transfers
+        for transfer in transfer_plan:
+            self.execute_shard_transfer(transfer)
+            self.update_handoff_progress(soho_id, transfer)
+        
+        # Monitor until complete
+        self.monitor_handoff(soho_id)
+    
+    def execute_shard_transfer(self, transfer):
+        """Transfer individual shard to recipient"""
+        # Fetch shard from exiting node
+        shard_data = self.fetch_shard(
+            soho_id=transfer.from_soho,
+            shard_id=transfer.shard_id
+        )
+        
+        # Verify integrity
+        if hash(shard_data) != transfer.expected_hash:
+            raise IntegrityError(f"Shard {transfer.shard_id} hash mismatch")
+        
+        # Send to recipient
+        self.send_shard(
+            soho_id=transfer.to_soho,
+            shard_id=transfer.shard_id,
+            data=shard_data
+        )
+        
+        # Recipient verifies
+        verification = self.request_verification(
+            soho_id=transfer.to_soho,
+            shard_id=transfer.shard_id
+        )
+        
+        if not verification.success:
+            raise TransferError(f"Recipient failed to verify shard {transfer.shard_id}")
+        
+        # Update shard location map
+        self.update_shard_location(
+            shard_id=transfer.shard_id,
+            old_location=transfer.from_soho,
+            new_location=transfer.to_soho
+        )
+    
+    def complete_handoff(self, soho_id):
+        """
+        Finalize exit and pay completion bonuses
+        """
+        exit_record = self.get_exit_record(soho_id)
+        
+        # Calculate bonuses
+        completion_bonus = 5.00
+        
+        # Time bonus if completed early
+        time_saved = exit_record.expected_completion - int(time.time())
+        if time_saved > 0:
+            time_bonus_rate = 0.10  # $0.10 per hour saved
+            time_bonus = min(time_saved / 3600 * time_bonus_rate, 2.00)
+        else:
+            time_bonus = 0
+        
+        # Verification bonus (all shards verified)
+        verification_bonus = 1.50 if exit_record.all_shards_verified else 0
+        
+        total_bonus = completion_bonus + time_bonus + verification_bonus
+        
+        # Pay bonuses
+        self.payment.process_exit_bonus(
+            soho_id=soho_id,
+            amount=total_bonus,
+            bonus_type="completion",
+            breakdown={
+                "completion": completion_bonus,
+                "time": time_bonus,
+                "verification": verification_bonus
+            }
+        )
+        
+        # Award badges
+        self.reputation.award_badge(soho_id, "reliable_steward")
+        
+        # Update reputation
+        rep = self.reputation.get_reputation(soho_id)
+        rep.graceful_exits += 1
+        if exit_record.all_shards_verified:
+            rep.exit_reliability_score = 5.0
+        self.reputation.update_reputation(soho_id, rep)
+        
+        # Mark exit complete
+        exit_record.status = "completed"
+        exit_record.completed_at = int(time.time())
+        exit_record.total_bonuses = (
+            exit_record.announcement_bonus + total_bonus
+        )
+        
+        # Publish completion
+        self.dds.publish(
+            f"/soho/{soho_id}/network/exit_complete",
+            exit_record
+        )
+        
+        return exit_record
+```
+
+### 6.3 Position Transfer Market
+
+**Position Listing:**
+
+```python
+class PositionMarket:
+    def list_position(self, soho_id, asking_price):
+        """List node position for sale"""
+        node = self.get_node(soho_id)
+        
+        # Calculate position value metrics
+        position = {
+            "transfer_id": generate_uuid(),
+            "seller": soho_id,
+            "listed_at": int(time.time()),
+            "asking_price": asking_price,
+            "currency": "USD",
+            "position_details": {
+                "storage_contributed_gb": node.storage.offered_gb,
+                "compute_contributed_cores": node.compute.cores_available,
+                "monthly_income": self.calc_monthly_income(soho_id),
+                "reputation_score": node.reputation.overall,
+                "contract_obligations": len(node.contracts.active),
+                "obligations_expire": self.calc_obligations_expire(node),
+                "badges": node.reputation.badges,
+                "member_since": node.member_since
+            },
+            "bids": [],
+            "status": "open"
+        }
+        
+        # Publish to market
+        self.dds.publish("/network/market/position_transfers", position)
+        
+        return position
+    
+    def place_bid(self, buyer_soho, transfer_id, offer_amount):
+        """Place bid on position"""
+        position = self.get_position(transfer_id)
+        
+        bid = {
+            "buyer": buyer_soho,
+            "offer": offer_amount,
+            "submitted": int(time.time()),
+            "status": "pending"
+        }
+        
+        position.bids.append(bid)
+        self.dds.publish("/network/market/position_transfers", position)
+        
+        # Notify seller
+        self.notify_node(position.seller, "new_position_bid", bid)
+        
+        return bid
+    
+    def accept_bid(self, transfer_id, bid_index):
+        """Seller accepts a bid"""
+        position = self.get_position(transfer_id)
+        bid = position.bids[bid_index]
+        
+        # Create transfer contract
+        contract = {
+            "contract_id": generate_uuid(),
+            "type": "position_transfer",
+            "seller": position.seller,
+            "buyer": bid.buyer,
+            "amount": bid.offer,
+            "currency": position.currency,
+            "position_details": position.position_details,
+            "created": int(time.time()),
+            "status": "pending_payment"
+        }
+        
+        # Escrow payment
+        self.escrow.lock_funds(
+            from_soho=bid.buyer,
+            amount=bid.offer,
+            contract_id=contract.contract_id
+        )
+        
+        # Initiate transfer
+        self.execute_position_transfer(contract)
+        
+        return contract
+    
+    def execute_position_transfer(self, contract):
+        """Transfer position from seller to buyer"""
+        seller = contract.seller
+        buyer = contract.buyer
+        
+        # 1. Transfer storage shards
+        self.transfer_all_shards(from_soho=seller, to_soho=buyer)
+        
+        # 2. Transfer active contracts
+        self.reassign_contracts(from_soho=seller, to_soho=buyer)
+        
+        # 3. Transfer partial reputation
+        seller_rep = self.reputation.get_reputation(seller)
+        buyer_rep = self.reputation.get_reputation(buyer)
+        
+        # Buyer inherits 50% of seller's reputation
+        buyer_rep.overall = (buyer_rep.overall + seller_rep.overall * 0.5) / 1.5
+        buyer_rep.badges.extend(
+            [b for b in seller_rep.badges if b.transferable]
+        )
+        
+        self.reputation.update_reputation(buyer, buyer_rep)
+        
+        # 4. Release payment to seller
+        self.escrow.release(
+            contract_id=contract.contract_id,
+            to_soho=seller,
+            amount=contract.amount,
+            currency=contract.currency
+        )
+        
+        # 5. Update position transfer status
+        contract.status = "completed"
+        contract.completed_at = int(time.time())
+        
+        # 6. Notify both parties
+        self.notify_node(seller, "position_sold", contract)
+        self.notify_node(buyer, "position_acquired", contract)
+        
+        return contract
+```
+
+### 6.4 Emergency Exit Handling
+
+**Unplanned Exit Detection:**
+
+```python
+class EmergencyExitHandler:
+    HEARTBEAT_TIMEOUT = 180  # 3 minutes
+    
+    def monitor_heartbeats(self):
+        """Continuously monitor for missing heartbeats"""
+        while True:
+            now = int(time.time())
+            
+            for node in self.get_all_nodes():
+                last_heartbeat = node.last_heartbeat_time
+                
+                if now - last_heartbeat > self.HEARTBEAT_TIMEOUT:
+                    self.handle_presumed_failure(node.soho_id)
+            
+            time.sleep(60)
+    
+    def handle_presumed_failure(self, soho_id):
+        """Handle node that stopped responding"""
+        node = self.get_node(soho_id)
+        
+        # Mark as presumed failed
+        node.status = "presumed_failed"
+        node.failed_at = int(time.time())
+        
+        # Trigger emergency replication
+        self.trigger_emergency_replication(soho_id)
+        
+        # Don't penalize reputation (could be hardware failure)
+        # Just note it happened
+        rep = self.reputation.get_reputation(soho_id)
+        rep.unplanned_exits += 1
+        self.reputation.update_reputation(soho_id, rep)
+        
+        # Notify network
+        self.dds.publish(
+            "/network/alerts/node_failure",
+            {
+                "soho_id": soho_id,
+                "failed_at": node.failed_at,
+                "affected_shards": len(node.storage.stored_shards),
+                "recovery_initiated": True
+            }
+        )
+    
+    def trigger_emergency_replication(self, failed_soho):
+        """Immediately begin replicating shards from failed node"""
+        shards = self.get_node_shards(failed_soho)
+        
+        for shard in shards:
+            # Check current redundancy
+            locations = self.get_shard_locations(shard.shard_id)
+            remaining = [loc for loc in locations if loc != failed_soho]
+            
+            file_config = self.get_file_config(shard.file_id)
+            
+            if file_config.redundancy_method == "replication":
+                # Need to restore to target replication factor
+                target = file_config.replication_factor
+                current = len(remaining)
+                
+                if current < target:
+                    # Urgent: below target replication
+                    priority = "critical"
+                    needed = target - current
+                elif current == target:
+                    # At target, but one node failed
+                    priority = "high"
+                    needed = 1
+                else:
+                    # Above target, no rush
+                    priority = "normal"
+                    needed = 0
+            
+            else:  # erasure coding
+                scheme = SCHEMES[file_config.erasure_scheme]
+                current = len(remaining)
+                
+                if current < scheme.data_shards:
+                    # CRITICAL: Below reconstruction threshold
+                    priority = "emergency"
+                    needed = scheme.data_shards + scheme.parity_shards - current
+                elif current < scheme.data_shards + scheme.parity_shards:
+                    # High: Can reconstruct but need more redundancy
+                    priority = "high"
+                    needed = scheme.data_shards + scheme.parity_shards - current
+                else:
+                    # At target
+                    priority = "normal"
+                    needed = 1
+            
+            # Queue replication job
+            if needed > 0:
+                self.queue_replication(
+                    shard_id=shard.shard_id,
+                    source_nodes=remaining,
+                    copies_needed=needed,
+                    priority=priority
+                )
+```
+
+---
+
+## 7. Security & Privacy Framework
+
+### 7.1 Encryption
+
+**Data at Rest:**
+
+```yaml
+# /etc/ntari/encryption.yaml
+storage:
+  mandatory_encryption: true
+  algorithm: aes-256-gcm
+  key_derivation: argon2id
+  
+  user_keys:
+    location: /home/user/.ntari/keys/
+    master_key: encrypted_with_user_password
+    rotation_days: 90
+    
+  network_keys:
+    shared_files: per_file_keys
+    distribution: encrypted_to_recipients
+```
+
+**Data in Transit:**
+
+```yaml
+network:
+  mesh_encryption: wpa3
+  dds_security: true
+  tls_version: "1.3"
+  
+  dds_security_plugins:
+    authentication: DDS:Auth:PKI-DH
+    access_control: DDS:Access:Permissions
+    crypto: DDS:Crypto:AES-GCM-GMAC
+```
+
+### 7.2 Hardware Access Control
+
+**Camera/Sensor Policy:**
+
+```json
+{
+  "device_id": "camera-logitech-c920",
+  "access_policy": {
+    "default": "disabled",
+    "require_explicit_approval": true,
+    "approval_timeout_seconds": 300,
+    "allowed_apps": [],
+    "session_logging": {
+      "enabled": true,
+      "log_location": "/var/log/ntari/hardware-access.log",
+      "retention_days": 30
+    },
+    "privacy_features": {
+      "led_indicator_required": true,
+      "audio_notification": true,
+      "screenshot_preview": true
+    }
+  }
+}
+```
+
+**Access Request Flow:**
+
+```python
+class HardwareAccessManager:
+    def request_camera_access(self, requesting_app, purpose, duration_seconds):
+        """
+        App requests camera access
+        Requires explicit user approval
+        """
+        # Create access request
+        request = {
+            "request_id": generate_uuid(),
+            "device_id": "camera-logitech-c920",
+            "requesting_app": requesting_app,
+            "purpose": purpose,
+            "duration_seconds": duration_seconds,
+            "requested_at": int(time.time()),
+            "status": "pending_approval"
+        }
+        
+        # Show user approval dialog
+        user_response = self.show_approval_dialog(request)
+        
+        if user_response.approved:
+            # Grant temporary access
+            session = self.create_access_session(
+                request_id=request.request_id,
+                expires_at=int(time.time()) + duration_seconds
+            )
+            
+            # Log access grant
+            self.log_access_event(
+                event="access_granted",
+                request=request,
+                session=session
+            )
+            
+            # Enable hardware
+            self.enable_device("camera-logitech-c920")
+            
+            # Show LED indicator
+            self.device_led_on("camera-logitech-c920")
+            
+            # Monitor session
+            self.monitor_session(session)
+            
+            return session
+        else:
+            # Log denial
+            self.log_access_event(
+                event="access_denied",
+                request=request,
+                reason=user_response.reason
+            )
+            
+            raise AccessDenied(f"User denied camera access for {requesting_app}")
+    
+    def show_approval_dialog(self, request):
+        """Display approval dialog to user"""
+        # GUI dialog
+        dialog = f"""
+        ┌────────────────────────────────────────┐
+        │ Camera Access Request                  │
+        ├────────────────────────────────────────┤
+        │ App: {request.requesting_app}          │
+        │ Purpose: {request.purpose}             │
+        │ Duration: {request.duration_seconds}s  │
+        │                                        │
+        │ [Approve] [Deny] [Details]             │
+        └────────────────────────────────────────┘
+        """
+        
+        return display_and_wait_for_response(dialog)
+```
+
+### 7.3 Identity & Authentication
+
+**Node Identity:**
+
+```yaml
+# /etc/ntari/identity.yaml
+node_id: ntari-{uuid}
+keypair:
+  algorithm: ed25519
+  public_key_path: /etc/ntari/keys/node_public.pem
+  private_key_path: /etc/ntari/keys/node_private.pem
+  
+owner_identity:
+  pgp_key: /home/user/.gnupg/
+  ssh_key: /home/user/.ssh/id_ed25519
+  
+dds_security:
+  identity_certificate: /etc/ntari/dds/cert.pem
+  permissions_ca: /etc/ntari/dds/permissions_ca.pem
+  governance_file: /etc/ntari/dds/governance.xml
+  permissions_file: /etc/ntari/dds/permissions.xml
+```
+
+**Message Signing:**
+
+```python
+class MessageSigner:
+    def sign_message(self, message_dict):
+        """Sign DDS message with node's private key"""
+        # Serialize message
+        canonical = json.dumps(message_dict, sort_keys=True)
+        
+        # Sign with Ed25519
+        signature = self.private_key.sign(canonical.encode())
+        
+        # Attach signature
+        message_dict["signature"] = base64.b64encode(signature).decode()
+        
+        return message_dict
+    
+    def verify_message(self, message_dict, sender_public_key):
+        """Verify message signature"""
+        # Extract signature
+        signature_b64 = message_dict.pop("signature")
+        signature = base64.b64decode(signature_b64)
+        
+        # Canonical form
+        canonical = json.dumps(message_dict, sort_keys=True)
+        
+        # Verify
+        try:
+            sender_public_key.verify(signature, canonical.encode())
+            return True
+        except:
+            return False
+```
+
+### 7.4 Privacy Controls
+
+**Location Privacy:**
+
+```json
+{
+  "privacy_settings": {
+    "location": {
+      "level": "city_only",
+      "options": ["hidden", "country_only", "state_only", "city_only", "exact"],
+      "jitter_radius_km": 5.0
+    },
+    "profile": {
+      "show_name": true,
+      "show_bio": true,
+      "show_skills": true,
+      "show_education": false,
+      "show_portfolio": "connections_only"
+    },
+    "activity": {
+      "show_online_status": false,
+      "show_recent_activity": "connections_only",
+      "show_earnings": "private"
+    }
+  }
+}
+```
+
+---
+
+## 8. Governance System
+
+### 8.1 Proposal Lifecycle
+
+**States:**
+
+```
+DRAFT → ACTIVE → PASSED/REJECTED → IMPLEMENTED
+```
+
+**Proposal Submission:**
+
+```python
+class GovernanceSystem:
+    def submit_proposal(self, soho_id, proposal_data):
+        """Submit a governance proposal"""
+        # Validate proposer reputation
+        rep = self.reputation.get_reputation(soho_id)
+        if rep.overall < 3.0:
+            raise InsufficientReputation("Need 3.0+ reputation to propose")
+        
+        # Create proposal
+        proposal = {
+            "proposal_id": generate_uuid(),
+            "title": proposal_data.title,
+            "description": proposal_data.description,
+            "type": proposal_data.type,
+            "scope": proposal_data.scope,
+            "submitted_by": soho_id,
+            "submitted_at": int(time.time()),
+            "voting_starts": int(time.time()) + 86400,  # 24h review period
+            "voting_ends": int(time.time()) + 86400 * 8,  # 7 day voting
+            "quorum_required": self.calc_quorum(proposal_data.scope),
+            "votes": {"yes": 0, "no": 0, "abstain": 0},
+            "weighted_votes": {"yes": 0, "no": 0, "abstain": 0},
+            "status": "active"
+        }
+        
+        # Publish to network
+        self.dds.publish("/network/governance/proposals", proposal)
+        
+        return proposal
+    
+    def calc_quorum(self, scope):
+        """Calculate required quorum based on scope"""
+        if scope == "global":
+            # 20% of all nodes
+            return int(self.get_node_count() * 0.20)
+        elif scope == "municipal":
+            # 30% of municipal nodes
+            return int(self.get_municipal_node_count() * 0.30)
+        elif scope == "wan":
+            # 25% of WAN nodes
+            return int(self.get_wan_node_count() * 0.25)
+        else:
+            # Local: 50% of local mesh
+            return int(self.get_local_node_count() * 0.50)
+```
+
+**Voting:**
+
+```python
+def cast_vote(self, soho_id, proposal_id, vote):
+    """Cast a vote on proposal"""
+    proposal = self.get_proposal(proposal_id)
+    
+    # Check voting period
+    now = int(time.time())
+    if now < proposal.voting_starts or now > proposal.voting_ends:
+        raise VotingClosed("Voting period not active")
+    
+    # Check for duplicate vote
+    existing = self.get_vote(soho_id, proposal_id)
+    if existing:
+        raise DuplicateVote("Already voted on this proposal")
+    
+    # Get voter's weight
+    rep = self.reputation.get_reputation(soho_id)
+    weight = rep.network_citizenship_tier_multiplier  # 1.0-1.5 based on tier
+    
+    # Record vote
+    vote_record = {
+        "proposal_id": proposal_id,
+        "voter": soho_id,
+        "vote": vote,  # "yes", "no", "abstain"
+        "weight": weight,
+        "cast_at": now,
+        "signature": self.sign_vote(soho_id, proposal_id, vote)
+    }
+    
+    # Update proposal tallies
+    proposal.votes[vote] += 1
+    proposal.weighted_votes[vote] += weight
+    
+    # Publish vote
+    self.dds.publish(f"/network/governance/votes", vote_record)
+    
+    # Update proposal
+    self.dds.publish("/network/governance/proposals", proposal)
+    
+    return vote_record
+```
+
+**Proposal Resolution:**
+
+```python
+def resolve_proposal(self, proposal_id):
+    """Resolve proposal after voting ends"""
+    proposal = self.get_proposal(proposal_id)
+    
+    # Check voting ended
+    if int(time.time()) < proposal.voting_ends:
+        raise VotingActive("Voting still in progress")
+    
+    # Check quorum
+    total_votes = sum(proposal.votes.values())
+    if total_votes < proposal.quorum_required:
+        proposal.status = "rejected"
+        proposal.rejection_reason = "Quorum not met"
+        self.dds.publish("/network/governance/proposals", proposal)
+        return proposal
+    
+    # Determine result (weighted votes)
+    yes_votes = proposal.weighted_votes["yes"]
+    no_votes = proposal.weighted_votes["no"]
+    
+    # Simple majority (can be configured per proposal type)
+    if yes_votes > no_votes:
+        proposal.status = "passed"
+        proposal.implementation_date = int(time.time()) + 86400 * 7  # 7 days
+        
+        # Schedule implementation
+        self.schedule_implementation(proposal)
+    else:
+        proposal.status = "rejected"
+        proposal.rejection_reason = "Majority voted no"
+    
+    # Publish final result
+    self.dds.publish("/network/governance/proposals", proposal)
+    
+    return proposal
+```
+
+### 8.2 Governance Scope
+
+**Global Scope:**
+- Network-wide parameter changes
+- Economic policy (pricing algorithms, minimum contributions)
+- Security standards
+- Protocol upgrades
+
+**Municipal Scope:**
+- Local mesh policies
+- Regional resource allocation
+- Community-specific rules
+
+**WAN Scope:**
+- Wide-area network coordination
+- Inter-municipal agreements
+- Regional standards
+
+**Local Scope:**
+- Immediate mesh network
+- Neighborhood-specific policies
+
+---
+
+## 9. Network Setup & Onboarding
+
+### 9.1 First Boot Wizard
+
+**Wizard Flow:**
+
+```
+1. Welcome & System Detection
+   ↓
+2. Resource Discovery
+   ↓
+3. Contribution Configuration
+   ↓
+4. Profile Setup
+   ↓
+5. Privacy Settings
+   ↓
+6. Network Discovery
+   ↓
+7. Pricing Strategy
+   ↓
+8. Verification & Launch
+```
+
+**Implementation:**
+
+```python
+class OnboardingWizard:
+    def run(self):
+        """Run first-boot onboarding wizard"""
+        # 1. Welcome
+        self.show_welcome()
+        
+        # 2. Detect hardware
+        resources = self.detect_resources()
+        self.display_resources(resources)
+        
+        # 3. Configure contributions
+        contribution = self.configure_contribution(resources)
+        
+        # 4. Setup profile
+        profile = self.setup_profile()
+        
+        # 5. Privacy settings
+        privacy = self.configure_privacy()
+        
+        # 6. Discover network
+        network = self.discover_network()
+        
+        # 7. Pricing strategy
+        pricing = self.configure_pricing(contribution)
+        
+        # 8. Generate node ID and keys
+        identity = self.generate_identity()
+        
+        # 9. Write configuration
+        self.write_config(
+            identity=identity,
+            resources=resources,
+            contribution=contribution,
+            profile=profile,
+            privacy=privacy,
+            pricing=pricing
+        )
+        
+        # 10. Start services
+        self.start_services()
+        
+        # 11. Publish to network
+        self.announce_node(identity, profile, resources)
+        
+        return identity
+    
+    def detect_resources(self):
+        """Auto-detect system resources"""
+        return {
+            "cpu": {
+                "model": read_cpu_model(),
+                "cores": os.cpu_count(),
+                "architecture": platform.machine()
+            },
+            "ram": {
+                "total_gb": get_total_ram_gb()
+            },
+            "storage": [
+                {
+                    "device": drive.device,
+                    "type": detect_drive_type(drive),
+                    "total_gb": drive.total / 1024**3,
+                    "model": drive.model
+                }
+                for drive in detect_drives()
+            ],
+            "network": [
+                {
+                    "interface": iface.name,
+                    "type": detect_interface_type(iface),
+                    "mac": iface.mac,
+                    "speed_mbps": iface.speed
+                }
+                for iface in detect_interfaces()
+            ],
+            "hardware": detect_peripherals()
+        }
+    
+    def configure_contribution(self, resources):
+        """User configures resource contribution"""
+        wizard = f"""
+        ┌─────────────────────────────────────────┐
+        │ Resource Contribution                   │
+        ├─────────────────────────────────────────┤
+        │ Detected Resources:                     │
+        │ • CPU: {resources.cpu.model}            │
+        │   {resources.cpu.cores} cores           │
+        │ • RAM: {resources.ram.total_gb} GB      │
+        │ • Storage: {sum(d.total_gb for d in resources.storage)} GB │
+        │                                         │
+        │ Network Contribution (1 GB minimum):    │
+        │ Storage: [____] GB  (1-{max_storage})   │
+        │ Compute: [____] cores (0-{max_cores})   │
+        │ RAM: [____] GB (0-{max_ram})            │
+        │                                         │
+        │ [Auto-Optimize] [Manual] [Next]         │
+        └─────────────────────────────────────────┘
+        """
+        
+        response = self.display_wizard(wizard)
+        
+        return {
+            "storage_gb": response.storage,
+            "compute_cores": response.compute,
+            "ram_gb": response.ram,
+            "hardware_devices": response.selected_devices
+        }
+```
+
+### 9.2 Network Discovery
+
+**Discovery Protocol:**
+
+```python
+class NetworkDiscovery:
+    def discover_nodes(self):
+        """Discover nearby NTARI nodes"""
+        # 1. Listen for heartbeats on local mesh
+        mesh_nodes = self.listen_mesh_heartbeats(timeout=30)
+        
+        # 2. Query WAN directory if internet available
+        wan_nodes = self.query_wan_directory() if self.has_internet() else []
+        
+        # 3. Combine and deduplicate
+        all_nodes = self.deduplicate(mesh_nodes + wan_nodes)
+        
+        # 4. Geo-sort by proximity
+        sorted_nodes = self.sort_by_distance(all_nodes, self.get_location())
+        
+        return sorted_nodes
+    
+    def listen_mesh_heartbeats(self, timeout):
+        """Listen for DDS heartbeats on mesh network"""
+        discovered = []
+        
+        # Subscribe to heartbeat topic
+        subscriber = self.dds.subscribe(
+            topic="/soho/+/heartbeat",  # + is wildcard
+            callback=lambda msg: discovered.append(msg)
+        )
+        
+        # Wait for timeout
+        time.sleep(timeout)
+        
+        subscriber.unsubscribe()
+        
+        return discovered
+```
+
+### 9.3 Settings Interface
+
+**Settings Menu Structure:**
+
+```
+/usr/bin/ntari-settings
+```
+
+```python
+class SettingsManager:
+    MENU_STRUCTURE = {
+        "Profile": {
+            "Personal Information": edit_personal_info,
+            "Skills & Education": edit_skills,
+            "Location & Privacy": edit_location,
+            "Public Keys": manage_keys
+        },
+        "Resources": {
+            "Compute Contribution": edit_compute,
+            "Storage Contribution": edit_storage,
+            "Hardware Devices": manage_hardware
+        },
+        "Pricing & Economics": {
+            "Pricing Strategy": edit_pricing,
+            "Payment Methods": manage_payments,
+            "Market Preferences": edit_market_prefs
+        },
+        "Privacy & Security": {
+            "Camera/Hardware Access": edit_hardware_policy,
+            "Data Retention": edit_retention,
+            "Encryption Settings": edit_encryption
+        },
+        "Network": {
+            "DDS Configuration": edit_dds_config,
+            "Mesh Connectivity": edit_mesh,
+            "Bandwidth Limits": edit_bandwidth
+        },
+        "Governance": {
+            "Voting Preferences": edit_voting,
+            "Proposal Notifications": edit_notifications
+        }
+    }
+    
+    def run(self):
+        """Run settings TUI"""
+        while True:
+            selection = self.display_menu(self.MENU_STRUCTURE)
+            if selection == "exit":
+                break
+            
+            self.handle_selection(selection)
+```
+
+**Profile Update Publishing:**
+
+```python
+def update_profile(self, changes):
+    """User updates profile, publish to network"""
+    profile = self.get_current_profile()
+    
+    # Apply changes
+    for key, value in changes.items():
+        set_nested(profile, key, value)
+    
+    # Update timestamp
+    profile.updated = int(time.time())
+    
+    # Publish to DDS
+    self.dds.publish(
+        f"/soho/{self.node_id}/profile",
+        profile
+    )
+    
+    # Write to local config
+    self.write_config(profile)
+```
+
+---
+
+## 10. Application Framework
+
+### 10.1 Application Structure
+
+**Agrinet Example:**
+
+```
+/opt/ntari/apps/agrinet/
+├── manifest.yaml
+├── schema/
+│   ├── soil_data.json
+│   ├── weather.json
+│   └── equipment.json
+├── bin/
+│   ├── agrinet-publisher
+│   ├── agrinet-subscriber
+│   └── agrinet-dashboard
+├── config/
+│   └── default.yaml
+└── data/
+    └── sensors.db
+```
+
+**manifest.yaml:**
+
+```yaml
+name: agrinet
+version: 1.0.0
+description: Agricultural data coordination protocol
+
+dds_requirements:
+  implementation: cyclone
+  domain: 1
+  qos_profile: reliable
+  topics:
+    publish:
+      - /agrinet/{uuid}/soil_data
+      - /agrinet/{uuid}/weather
+      - /agrinet/{uuid}/equipment
+    subscribe:
+      - /agrinet/+/soil_data
+      - /agrinet/network/aggregated
+
+resource_requirements:
+  compute: 0.5  # cores
+  memory: 256   # MB
+  storage: 100  # MB
+  network: 1    # Mbps
+
+permissions:
+  - /network/storage/read
+  - /network/storage/write
+  - /soho/{uuid}/resources/sensors
+
+dependencies:
+  - python3
+  - numpy
+  - scipy
+
+installation:
+  pre_install: ./scripts/check_sensors.sh
+  post_install: ./scripts/setup_db.sh
+
+service:
+  daemon: true
+  start_command: ./bin/agrinet-publisher --daemon
+  restart_policy: always
+```
+
+### 10.2 Application Development Guide
+
+**Creating a New Application:**
+
+```bash
+# Create app structure
+ntari app create --name myapp --template basic
+
+# Edit manifest
+vim /opt/ntari/apps/myapp/manifest.yaml
+
+# Define DDS topics
+ntari app topic add --name /myapp/{uuid}/data --qos reliable
+
+# Develop application
+vim /opt/ntari/apps/myapp/bin/myapp-main
+
+# Test locally
+ntari app test myapp
+
+# Package
+ntari app package myapp --output myapp-1.0.0.tar.gz
+
+# Publish to network
+ntari app publish myapp-1.0.0.tar.gz
+```
+
+**DDS Publishing Example:**
+
+```python
+#!/usr/bin/env python3
+# /opt/ntari/apps/myapp/bin/myapp-publisher
+
+from ntari.dds import DDSPublisher
+import json
+import time
+
+# Load configuration
+config = load_config("/opt/ntari/apps/myapp/config/default.yaml")
+node_id = get_node_id()
+
+# Create publisher
+publisher = DDSPublisher(
+    topic=f"/myapp/{node_id}/data",
+    qos="reliable",
+    domain=config.dds_domain
+)
+
+# Publish loop
+while True:
+    data = {
+        "node_id": node_id,
+        "timestamp": int(time.time()),
+        "value": read_sensor(),
+        "unit": "celsius"
+    }
+    
+    publisher.publish(data)
+    
+    time.sleep(config.publish_interval)
+```
+
+### 10.3 Application Discovery
+
+**App Marketplace:**
+
+```
+/network/apps/marketplace
+```
+
+```json
+{
+  "apps": [
+    {
+      "app_id": "agrinet",
+      "name": "Agrinet",
+      "description": "Agricultural data coordination",
+      "version": "1.0.0",
+      "publisher": "NTARI Foundation",
+      "category": "Agriculture",
+      "downloads": 1247,
+      "rating": 4.8,
+      "verified": true,
+      "download_url": "https://apps.ntari.network/agrinet-1.0.0.tar.gz",
+      "signature": "ed25519:{signature}"
+    }
+  ]
+}
+```
+
+**Installation:**
+
+```bash
+# Browse marketplace
+ntari app browse
+
+# Search
+ntari app search agriculture
+
+# Install
+ntari app install agrinet
+
+# Enable
+ntari app enable agrinet
+
+# Start
+ntari app start agrinet
+```
+
+---
+
+## 11. Implementation Requirements
+
+### 11.1 Base System
+
+**Operating System:**
+- Alpine Linux 3.19+
+- Kernel: Linux 6.1+
+- Init: OpenRC
+
+**Core Packages:**
+```
+# Required packages
+alpine-base
+python3
+py3-pip
+dbus
+openssl
+openssh
+bash
+git
+```
+
+### 11.2 Network Stack
+
+**Mesh Networking:**
+```
+batman-adv
+iw
+wpa_supplicant
+hostapd
+```
+
+**DDS Implementation:**
+```
+cyclonedds
+cyclonedds-python
+```
+
+### 11.3 Storage Components
+
+**Filesystem:**
+```
+e2fsprogs (ext4)
+xfsprogs
+btrfs-progs
+cryptsetup (encryption)
+```
+
+**Erasure Coding:**
+```
+liberasurecode
+pyeclib
+```
+
+**Monitoring:**
+```
+smartmontools
+lm-sensors
+```
+
+### 11.4 Development Tools
+
+**Python Dependencies:**
+```txt
+# requirements.txt
+cyclonedds==0.10.2
+cryptography==41.0.0
+pynacl==1.5.0
+requests==2.31.0
+pyeclib==1.6.0
+Flask==3.0.0
+```
+
+**Build Tools:**
+```
+gcc
+g++
+make
+cmake
+python3-dev
+```
+
+### 11.5 Minimum Hardware Requirements
+
+**Absolute Minimum (Mesh Node):**
+- CPU: 1 core, 1 GHz
+- RAM: 512 MB
+- Storage: 4 GB (1 GB for system, 1 GB contribution, 2 GB overhead)
+- Network: WiFi or Ethernet
+
+**Recommended (Active Participant):**
+- CPU: 2+ cores, 1.5 GHz+
+- RAM: 2 GB+
+- Storage: 32 GB+ (mixed SSD/HDD)
+- Network: Broadband internet + WiFi mesh capability
+
+**Optimal (Service Provider):**
+- CPU: 4+ cores, 2 GHz+
+- RAM: 8 GB+
+- Storage: 256 GB SSD + 1 TB HDD
+- Network: Gigabit internet + mesh AP
+
+### 11.6 Installation Procedure
+
+**Image Creation:**
+
+```bash
+# Build NTARI OS image
+git clone https://github.com/NTARI-RAND/ntari-os
+cd ntari-os
+./build-image.sh --arch x86_64 --output ntari-os-x86_64.iso
+
+# For ARM
+./build-image.sh --arch aarch64 --output ntari-os-arm64.img
+```
+
+**Installation:**
+
+```bash
+# Write to USB
+dd if=ntari-os-x86_64.iso of=/dev/sdX bs=4M status=progress
+
+# Boot from USB
+# Follow installation wizard
+# System will auto-configure on first boot
+```
+
+### 11.7 Service Architecture
+
+**System Services:**
+
+```ini
+# /etc/init.d/ntari-core
+#!/sbin/openrc-run
+
+name="NTARI Core Services"
+command="/usr/bin/ntari-daemon"
+command_args="--config /etc/ntari/daemon.conf"
+pidfile="/var/run/ntari/daemon.pid"
+
+depend() {
+    need net
+    use logger
+    after firewall
+}
+```
+
+**Service Startup Order:**
+
+```
+1. ntari-identity     # Generate/load node identity
+2. ntari-dds          # Start DDS middleware
+3. ntari-storage      # Storage daemon
+4. ntari-time-sync    # Time consensus
+5. ntari-dns          # Local DNS
+6. ntari-directory    # Network directory
+7. soholink-broker    # Economic coordination
+8. ntari-apps         # Installed applications
+```
+
+---
+
+## 12. Appendices
+
+### 12.1 Glossary
+
+**SOHO**: Small Office/Home Office - a node in the NTARI network
+
+**DDS**: Data Distribution Service - publish/subscribe middleware for real-time systems
+
+**Tic**: Time consensus unit in transaction blockchain
+
+**LBTAS**: Leveson-Based Trade Assessment Scale - 6-point reputation system (-1 to +4) based on Nancy Leveson's aircraft software assessment methodology. Four criteria: Reliability, Usability, Performance, Support.
+
+**TUI**: Terminal User Interface - ncurses-based command-line interface with "hyper DOS + emojis" aesthetic
+
+**GUI**: Graphical User Interface - XFCE/LXQt-based desktop environment for mainstream users
+
+**OpenStreetMap**: Free, open-source mapping platform used for network geographic visualization
+
+**Leaflet.js**: JavaScript library for interactive maps, used in NTARI web dashboard
+
+**Shard**: Piece of a file in distributed storage (either data or parity)
+
+**Erasure Coding**: Data redundancy technique using parity mathematics (like RAID)
+
+**Replication**: Data redundancy by storing complete copies
+
+**Tier**: Storage classification based on access pattern and media type
+
+**Legacy Handoff**: Graceful exit process with data transfer
+
+**Position Transfer**: Selling node position to another participant
+
+**SoHoLINK**: Economic coordination layer enabling peer-to-peer job matching
+
+**Mesh Network**: Decentralized network where nodes relay data for each other
+
+**WAN**: Wide Area Network - interconnected SOHOs across larger geographic areas
+
+**Municipal Network**: Local/city-level SOHO cluster
+
+### 12.2 Configuration File Reference
+
+**Complete `/etc/ntari/ntari.conf`:**
+
+```ini
+[identity]
+node_id = ntari-{uuid}
+keypair_path = /etc/ntari/keys/
+owner_name = Afi
+
+[network]
+preferred_interface = eth0
+mesh_enabled = true
+mesh_ssid = NTARI-Mesh
+wan_enabled = true
+
+[dds]
+implementation = cyclone
+domain_system = 0
+domain_apps_start = 1
+security_enabled = true
+
+[storage]
+base_path = /var/lib/ntari/storage
+mandatory_contribution_gb = 1.0
+auto_tier = true
+encryption_enabled = true
+
+[economics]
+pricing_mode = manual
+currency = USD
+enable_payments = true
+
+[governance]
+auto_vote = false
+notification_enabled = true
+
+[privacy]
+location_level = city_only
+show_online_status = false
+
+[logging]
+level = info
+path = /var/log/ntari/
+rotation_days = 30
+```
+
+### 12.3 API Reference
+
+**NTARI CLI Tool:**
+
+```bash
+# Network management
+ntari network discover
+ntari network status
+ntari network join <mesh-ssid>
+
+# Resource management
+ntari resources show
+ntari resources edit
+
+# Storage operations
+ntari storage upload <file>
+ntari storage download <file-id>
+ntari storage list
+ntari storage info <file-id>
+
+# Economic coordination
+ntari market browse
+ntari bid submit <job-id> <amount>
+ntari agent profile edit
+ntari earnings show
+
+# Governance
+ntari governance proposals
+ntari governance vote <proposal-id> <yes|no|abstain>
+
+# App management
+ntari app browse
+ntari app install <app-name>
+ntari app start <app-name>
+ntari app stop <app-name>
+
+# Settings
+ntari settings
+ntari-settings gui
+```
+
+### 12.4 Troubleshooting Guide
+
+**Common Issues:**
+
+1. **Node not discovered by network**
+   - Check DDS domain configuration
+   - Verify firewall allows DDS ports (7400, 7401)
+   - Confirm network connectivity
+
+2. **Storage tier migration not working**
+   - Check `/var/log/ntari/storage-daemon.log`
+   - Verify `auto_tier = true` in config
+   - Ensure sufficient CPU for erasure coding
+
+3. **Hardware access denied**
+   - Review `/var/log/ntari/hardware-access.log`
+   - Check device permissions in `/etc/ntari/hardware-security.yaml`
+   - Verify user is in `ntari-hardware` group
+
+4. **Exit handoff stuck**
+   - Check network connectivity to recipient nodes
+   - Review shard transfer logs
+   - Manually trigger completion: `ntari exit complete --force`
+
+### 12.5 Performance Tuning
+
+**For Low-Power Devices (Raspberry Pi):**
+
+```yaml
+# /etc/ntari/performance.yaml
+storage:
+  reconstruction:
+    max_concurrent_jobs: 1
+    cpu_limit_percent: 15
+  
+  tier_preference:
+    - tier_2  # SSD, lower power
+    - tier_1  # HDD only if necessary
+    
+dds:
+  discovery_period_seconds: 120  # Reduce discovery frequency
+  heartbeat_interval_seconds: 60
+```
+
+**For High-Performance Nodes:**
+
+```yaml
+storage:
+  reconstruction:
+    max_concurrent_jobs: 4
+    cpu_limit_percent: 50
+  
+  cache:
+    enabled: true
+    size_mb: 1024
+
+dds:
+  discovery_period_seconds: 10
+  heartbeat_interval_seconds: 30
+  queue_size: 1000
+```
+
+### 12.6 Security Hardening
+
+**Firewall Configuration:**
+
+```bash
+# Allow DDS
+iptables -A INPUT -p udp --dport 7400:7401 -j ACCEPT
+iptables -A INPUT -p tcp --dport 7400:7401 -j ACCEPT
+
+# Allow SSH (optional, for remote management)
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+# Allow mesh (batman-adv)
+iptables -A INPUT -i bat0 -j ACCEPT
+
+# Drop everything else
+iptables -P INPUT DROP
+```
+
+**AppArmor Profile:**
+
+```
+# /etc/apparmor.d/usr.bin.ntari-storage-daemon
+
+#include <tunables/global>
+
+/usr/bin/ntari-storage-daemon {
+  #include <abstractions/base>
+  #include <abstractions/python>
+  
+  /var/lib/ntari/storage/** rw,
+  /etc/ntari/** r,
+  /var/log/ntari/** rw,
+  
+  # DDS
+  network inet dgram,
+  network inet stream,
+  
+  # Block sensitive files
+  deny /home/** r,
+  deny /root/** r,
+}
+```
+
+### 12.7 Roadmap & Future Development
+
+**Phase 1 (Q1 2026): MVP - Server Edition**
+- Basic DDS communication
+- Simple replication-based storage
+- Manual pricing and bidding
+- CLI tools (Terminal UI)
+- LBTAS reputation engine
+- Target: 100-500 nodes, tech enthusiasts
+
+**Phase 2 (Q2 2026): Desktop Edition & Economic Layer**
+- NTARI OS Desktop Edition (XFCE/LXQt GUI)
+- SoHoLINK broker implementation
+- Agent profiles and scheduling
+- Automated bid matching
+- Web-based dashboard (OpenStreetMap integration)
+- First boot wizard for mainstream users
+- Target: 1,000-5,000 nodes, early mainstream adoption
+
+**Phase 3 (Q3 2026): Advanced Storage & Android**
+- Erasure coding implementation
+- Automatic tier migration
+- SMART monitoring and rebalancing
+- Position transfer market
+- **NTARI Android App launch**
+- Mobile background services
+- Battery optimization
+- Target: 10,000-20,000 nodes (includes mobile)
+
+**Phase 4 (Q4 2026): Governance & iOS**
+- Full governance system
+- Agrinet protocol launch
+- Application marketplace
+- **NTARI iOS App launch**
+- Cross-device federation
+- Target: 25,000-50,000 nodes
+
+**Phase 5 (2027): Scale & Ecosystem**
+- Lightning Network integration for micropayments
+- Advanced mesh routing algorithms
+- Hardware acceleration for erasure coding
+- IoT device support
+- Cross-city federation
+- NTARI OS Lite Edition
+- Target: 100,000+ nodes across multiple cities
+
+**Phase 6 (2028+): Global Network**
+- International expansion
+- Multi-language support (Spanish, Portuguese, Chinese, Arabic, Hindi)
+- Industry-specific applications beyond Agrinet
+- Municipal government integrations
+- Platform cooperative federation
+- Target: 500,000+ nodes globally
+
+---
+
+## Document History
+
+- Version 1.1 - February 15, 2026 - Multi-platform update (Desktop GUI, Mobile, LBTAS correction)
+- Version 1.0 - February 14, 2026 - Initial specification
+- Author: Network Theory Applied Research Institute
+- Contributors: Afi (Executive Director), Claude (AI Assistant)
+- License: Creative Commons Attribution-ShareAlike 4.0
+
+---
+
+**END OF SPECIFICATION**
+
+This specification document provides a complete technical blueprint for implementing NTARI OS. It combines cooperative economics, distributed systems architecture, and democratic governance to create an alternative to extractive platform models.

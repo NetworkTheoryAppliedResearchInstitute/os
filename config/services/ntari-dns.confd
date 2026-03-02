@@ -1,0 +1,28 @@
+# NTARI OS — ntari-dns OpenRC service configuration
+# /etc/conf.d/ntari-dns
+#
+# This file is sourced by the ntari-dns OpenRC init script.
+# Edit these values to configure the DNS node without touching the init script.
+
+# Path to dnsmasq configuration file.
+# The init script writes a default if this file does not exist.
+NTARI_DNS_CONF="/etc/ntari/dnsmasq.conf"
+
+# ROS2 domain ID for publishing health topics.
+# Must match ROS_DOMAIN_ID in /etc/conf.d/ros2-domain.
+ROS_DOMAIN_ID=0
+
+# RMW implementation (do not change unless you know what you're doing)
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"
+
+# Health publish interval in seconds (used by the background health loop).
+# Lower values mean more frequent DDS health messages but higher overhead.
+NTARI_DNS_HEALTH_INTERVAL=30
+
+# Upstream DNS servers to use for forwarding (space-separated).
+# These are written into dnsmasq.conf at first start if the config is
+# auto-generated.  To change live, edit /etc/ntari/dnsmasq.conf directly.
+NTARI_DNS_UPSTREAM="9.9.9.9 149.112.112.112"
+
+# Local domain served by this node
+NTARI_DNS_LOCAL_DOMAIN="ntari.local"

@@ -1,0 +1,229 @@
+#!/sbin/openrc-run
+# NTARI OS — VPN / Federation Node (ntari_vpn_node)
+# Phase 7: Services Layer — High Priority Tier
+#
+# Wraps WireGuard as a ROS2 lifecycle node.
+# This is the DDS federation gateway: WireGuard tunnels carry DDS traffic
+# between cooperative nodes across the internet, enabling the Phase 9
+# inter-cooperative graph where each cooperative's DDS domain is visible
+# as a subgraph in the other's globe interface.
+#
+# Architecture:
+#   Each NTARI node that participates in federation runs this service.
+#   The WireGuard interface (wg-ntari) bridges two DDS domains:
+#     - Local domain (domain 0, LAN multicast)
+#     - Federation domain (domain 1, unicast over WireGuard tunnel)
+#   The ros2-domain service on domain 0 remains primary for local services.
+#   A second ros2 daemon instance on domain 1 handles cross-cooperative traffic.
+#
+# Publishes:
+#   /ntari/vpn/health           — std_msgs/String : healthy | degraded | failed
+#   /ntari/vpn/status           — std_msgs/String : JSON with peer count, rx/tx bytes
+#   /ntari/vpn/peers            — std_msgs/String : JSON array of connected peer UUIDs
+#
+# Boot dependencies:
+#   - Requires net (WireGuard needs a routable interface)
+#   - After ros2-domain (publishes to local DDS domain 0)
+#   - After ntari-dns (DNS may be needed for peer endpoint resolution)
+#   - After ntari-ntp (WireGuard handshakes are time-sensitive; clock must be sane)
+#
+# Configuration:
+#   /etc/ntari/wireguard/wg-ntari.conf — WireGuard interface configuration
+#   /etc/conf.d/ntari-vpn              — Service parameters
+#
+# Note: WireGuard kernel module must be available (kernel >= 5.6, or wireguard-tools + kmod)
+
+name="ntari-vpn"
+description="NTARI VPN/Federation Node — WireGuard + ROS2 health publishing"
+
+WG_IFACE="${NTARI_VPN_IFACE:-wg-ntari}"
+WG_CONF="${NTARI_VPN_WG_CONF:-/etc/ntari/wireguard/wg-ntari.conf}"
+
+# The main "command" for this service is wg-quick up, which is not a
+# persistent process — WireGuard runs in-kernel.  We use a health loop
+# as the supervised process.
+command="/usr/local/bin/ros2-node-health"
+command_args="loop vpn ${NTARI_VPN_HEALTH_INTERVAL:-30} wg"
+command_background="yes"
+pidfile="/run/ntari-vpn-health.pid"
+command_user="root"
+
+output_log="/var/log/ntari/vpn.log"
+error_log="/var/log/ntari/vpn.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    after ntari-ntp ntari-dns
+    # VPN comes up before identity/files which may need inter-cooperative auth
+    before ntari-identity ntari-files
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+    mkdir -p /etc/ntari/wireguard
+    chmod 700 /etc/ntari/wireguard
+
+    # Verify WireGuard tools
+    if ! command -v wg >/dev/null 2>&1; then
+        eerror "wg (wireguard-tools) not found"
+        eerror "Install via: apk add wireguard-tools"
+        return 1
+    fi
+
+    if ! command -v wg-quick >/dev/null 2>&1; then
+        eerror "wg-quick not found — install wireguard-tools"
+        return 1
+    fi
+
+    # Check WireGuard kernel support
+    if ! modprobe wireguard 2>/dev/null && \
+       ! [ -f /sys/module/wireguard/version ] && \
+       ! ip link add dev wg-test type wireguard 2>/dev/null; then
+        ewarn "WireGuard kernel module may not be available"
+        ewarn "Ensure kernel >= 5.6 or wireguard-go is installed"
+        # Non-fatal: wg-quick will surface the error
+    fi
+    # Clean up test interface if it was created
+    ip link del wg-test 2>/dev/null || true
+
+    # Write a placeholder config if none exists
+    if [ ! -f "${WG_CONF}" ]; then
+        einfo "Writing placeholder WireGuard config: ${WG_CONF}"
+        # Generate a keypair for this node
+        WG_PRIVKEY=$(wg genkey 2>/dev/null || echo "GENERATE_PRIVATE_KEY_HERE")
+        WG_PUBKEY=$(echo "${WG_PRIVKEY}" | wg pubkey 2>/dev/null || echo "GENERATE_PUBLIC_KEY_HERE")
+
+        cat > "${WG_CONF}" <<WGCONF_EOF
+# NTARI OS — WireGuard Federation Interface
+# /etc/ntari/wireguard/wg-ntari.conf
+#
+# This is the inter-cooperative federation tunnel.
+# Each cooperative node that participates in federation needs:
+#   1. A keypair (generated below — keep PrivateKey SECRET)
+#   2. The public keys and endpoints of peer cooperatives
+#   3. A unique IP in the federation subnet (e.g. 10.99.0.x/24)
+#
+# Share your PublicKey with peer cooperatives.
+# Add their public keys as [Peer] sections below.
+#
+# See: docs/FEDERATION.md for setup instructions.
+
+[Interface]
+# This node's private key (KEEP SECRET — chmod 600 this file)
+PrivateKey = ${WG_PRIVKEY}
+# This node's public key (share with peer cooperatives):
+# PublicKey = ${WG_PUBKEY}
+
+# IP address on the federation overlay network
+# Each cooperative node gets a unique IP in this range
+Address = 10.99.0.1/24
+
+# UDP port to listen on for incoming federation connections
+ListenPort = 51820
+
+# Bring up the interface and set up routing
+PostUp   = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT
+
+# ── Example Peer (add one section per cooperative partner) ────────────────
+# [Peer]
+# # Human-readable comment for this peer
+# # PublicKey of the peer cooperative's ntari-vpn node
+# PublicKey = BASE64_PEER_PUBLIC_KEY_HERE
+# # Peer's public IP:port (or DNS name)
+# Endpoint = cooperative.example.org:51820
+# # Which IPs are routed through this peer
+# AllowedIPs = 10.99.0.2/32
+# # Keep the tunnel alive through NAT (send keepalive every 25 seconds)
+# PersistentKeepalive = 25
+WGCONF_EOF
+        chmod 600 "${WG_CONF}"
+        ewarn "Placeholder WireGuard config written to ${WG_CONF}"
+        ewarn "Edit the config to add peer cooperatives, then restart ntari-vpn."
+    fi
+
+    # Verify config permissions (private key must be protected)
+    CONF_PERMS=$(stat -c '%a' "${WG_CONF}" 2>/dev/null || echo "unknown")
+    if [ "${CONF_PERMS}" != "600" ]; then
+        ewarn "WireGuard config has loose permissions (${CONF_PERMS}); setting to 600"
+        chmod 600 "${WG_CONF}"
+    fi
+
+    einfo "VPN/Federation node starting (WireGuard interface: ${WG_IFACE})"
+}
+
+start() {
+    ebegin "Bringing up WireGuard interface ${WG_IFACE}"
+
+    # wg-quick up brings up the interface and configures routing
+    wg-quick up "${WG_CONF}" >> /var/log/ntari/vpn.log 2>&1
+    local rc=$?
+
+    if [ $rc -ne 0 ]; then
+        eend $rc "wg-quick up failed — check ${WG_CONF} and kernel WireGuard support"
+        return $rc
+    fi
+
+    eend 0
+
+    # Start health publishing loop via start-stop-daemon
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile "${pidfile}" \
+        --exec /usr/local/bin/ros2-node-health \
+        -- loop vpn "${NTARI_VPN_HEALTH_INTERVAL:-30}" wg \
+        >> /var/log/ntari/vpn.log 2>&1 || true
+}
+
+start_post() {
+    # Report peer count on startup
+    PEER_COUNT=0
+    if command -v wg >/dev/null 2>&1; then
+        PEER_COUNT=$(wg show "${WG_IFACE}" peers 2>/dev/null | wc -l || echo "0")
+    fi
+
+    HEALTH_STATE="healthy"
+    # No peers configured yet — mark degraded but not failed
+    [ "${PEER_COUNT}" -eq 0 ] && HEALTH_STATE="degraded"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish vpn "${HEALTH_STATE}" \
+            "backend=wireguard" "iface=${WG_IFACE}" "peers=${PEER_COUNT}" &
+    fi
+
+    einfo "VPN node running (${WG_IFACE}, ${PEER_COUNT} peers) — /ntari/vpn/health active"
+}
+
+stop_pre() {
+    einfo "Stopping VPN/Federation node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish vpn failed "reason=service_stopped" || true
+    fi
+
+    # Stop health loop
+    start-stop-daemon --stop --pidfile "${pidfile}" \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f "${pidfile}"
+}
+
+stop() {
+    ebegin "Bringing down WireGuard interface ${WG_IFACE}"
+    wg-quick down "${WG_CONF}" >> /var/log/ntari/vpn.log 2>&1 || true
+    eend 0
+}

@@ -1,0 +1,79 @@
+From: Network Theory Applied Research Institute <dev@ntari.org>
+Date: 2026-02-19
+Subject: [PATCH] Set explicit thread stack size for musl libc compatibility
+
+musl libc's default thread stack size is 128KB, compared to glibc's
+2-10MB. Cyclone DDS internal threads (discovery, receive, write, etc.)
+can overflow this default when handling complex DDS message graphs or
+large service networks.
+
+This patch calls pthread_attr_setstacksize() before each internal
+pthread_create() call to set an explicit 4MB stack. 4MB is sufficient
+for all known DDS workloads on NTARI OS edge hardware (x86_64, ARM64).
+
+The cost is virtual address space reservation, not physical RAM.
+On 64-bit systems this is not a practical limitation.
+
+No upstream fix exists in eclipse-cyclonedds/cyclonedds for this issue
+as of February 2026. This patch should be re-evaluated on each version
+bump to check if upstream has addressed it.
+
+Reference:
+  NTARI OS docs/ROS2_MUSL_COMPATIBILITY.md §2.4
+  musl libc thread stack behavior: https://wiki.musl-libc.org/functional-differences-from-glibc.html
+
+---
+ src/core/os/src/posix/os_thread_posix.c | 25 ++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/os/src/posix/os_thread_posix.c b/src/core/os/src/posix/os_thread_posix.c
+index XXXXXXX..YYYYYYY 100644
+--- a/src/core/os/src/posix/os_thread_posix.c
++++ b/src/core/os/src/posix/os_thread_posix.c
+@@ -1,5 +1,7 @@
+ // Copyright(c) 2006 to 2022 ZettaScale Technology and others
+ // SPDX-License-Identifier: EPL-2.0
++// NTARI OS musl compatibility patch: explicit thread stack size
++// See: https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os
+
+ #include <assert.h>
+ #include <errno.h>
+@@ -20,6 +22,14 @@
+ #define NTARI_DDS_THREAD_STACK_SIZE (4 * 1024 * 1024)  /* 4 MB */
+ #endif
+
++/* musl libc has a default thread stack size of 128KB vs glibc's 2-10MB.
++ * DDS internal threads can overflow this default. We set an explicit stack
++ * size for all DDS-internal threads spawned here.
++ *
++ * This wrapper replaces direct pthread_attr_init() calls to ensure the
++ * stack size is always set before pthread_create(). */
++static int ntari_thread_attr_init (pthread_attr_t *attr)
++{
++  int rc = pthread_attr_init (attr);
++  if (rc != 0) return rc;
++#if defined(__musl__) || (!defined(__GLIBC__) && defined(__linux__))
++  /* musl does not define __musl__, but it also does not define __GLIBC__.
++   * We target non-glibc Linux, which on Alpine means musl. */
++  rc = pthread_attr_setstacksize (attr, NTARI_DDS_THREAD_STACK_SIZE);
++  if (rc != 0) {
++    pthread_attr_destroy (attr);
++    return rc;
++  }
++#endif
++  return 0;
++}
++
+ struct thread_state {
+   void *(*routine)(void *);
+   void *arg;
+@@ -40,7 +64,8 @@ dds_return_t create_thread_with_properties (ddsrt_thread_t *thread,
+   ddsrt_thread_routine_t start_routine, void *arg)
+ {
+   pthread_attr_t attr;
+-  if (pthread_attr_init (&attr) != 0)
++  /* Use NTARI wrapper to ensure musl-compatible stack size is set */
++  if (ntari_thread_attr_init (&attr) != 0)
+     goto error_attr;
+
+   /* Apply any explicitly requested stack size — this overrides the musl

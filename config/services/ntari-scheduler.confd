@@ -1,0 +1,21 @@
+# NTARI OS — Scheduler Node Configuration
+# /etc/conf.d/ntari-scheduler
+#
+# Override these values in /etc/conf.d/ntari-scheduler on the deployed node.
+
+# Port for the scheduler HTTP server (Caddy reverse-proxies /scheduler/ here)
+NTARI_SCHEDULER_PORT=8092
+
+# Path to the Caddyfile (patched at start_pre to add /scheduler route)
+NTARI_SCHEDULER_CADDY_CONF=/etc/ntari/Caddyfile
+
+# Health publish interval in seconds
+NTARI_SCHEDULER_HEALTH_INTERVAL=30
+
+# Role evaluation interval in seconds (how often to poll for policy/capabilities changes)
+NTARI_SCHEDULER_EVAL_INTERVAL=30
+
+# Override input/output file paths if needed
+# NTARI_HW_CAPABILITIES=/ntari/node/capabilities
+# NTARI_NODE_POLICY=/ntari/node/policy
+# NTARI_SCHEDULER_ROLES=/ntari/scheduler/roles

@@ -1,0 +1,26 @@
+# NTARI OS — WAN Node Configuration
+# /etc/conf.d/ntari-wan
+#
+# Override these values in /etc/conf.d/ntari-wan on the deployed node.
+
+# WAN (internet-facing) interface — typically the second NIC
+# Set to eth0 if you have a single NIC and your ISP is on that interface.
+NTARI_WAN_IFACE=eth1
+
+# LAN (cooperative-facing) interface — NAT traffic originates here
+NTARI_LAN_IFACE=eth0
+
+# WAN addressing mode: dhcp or static
+NTARI_WAN_MODE=dhcp
+
+# ── Static mode settings (only used when NTARI_WAN_MODE=static) ──────────────
+# NTARI_WAN_IP=203.0.113.10      # Your static WAN IP address
+# NTARI_WAN_PREFIX=24            # Prefix length (CIDR notation)
+# NTARI_WAN_GW=203.0.113.1       # Default gateway (your ISP's router)
+# NTARI_WAN_DNS=9.9.9.9          # Upstream DNS (optional; dnsmasq forwards)
+
+# Enable NAT masquerade (allows LAN nodes to reach the internet via this node)
+NTARI_WAN_NAT=yes
+
+# Health publish interval in seconds
+NTARI_WAN_HEALTH_INTERVAL=30

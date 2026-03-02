@@ -1,0 +1,23 @@
+# NTARI OS — ntari-ntp OpenRC service configuration
+# /etc/conf.d/ntari-ntp
+#
+# This file is sourced by the ntari-ntp OpenRC init script.
+# ntari-ntp wraps Chrony with ROS2 graph health publishing.
+# Chrony itself is configured in /etc/chrony/chrony.conf.
+
+# Health publish interval in seconds.
+# At each interval, chronyc tracking is called to read stratum + sync state.
+NTARI_NTP_HEALTH_INTERVAL=30
+
+# ROS2 domain ID for health topic publishing.
+# Must match ROS_DOMAIN_ID in /etc/conf.d/ros2-domain.
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"
+
+# Stratum threshold: if chronyd reports stratum >= this value, the node
+# is published as "degraded" rather than "healthy".
+# Stratum 16 means unsynchronized; stratum 0 means stratum-0 reference clock.
+# Default: flag as degraded if stratum >= 8 (unusually high for a local node)
+NTARI_NTP_DEGRADED_STRATUM=8

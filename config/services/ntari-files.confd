@@ -1,0 +1,22 @@
+# NTARI OS — ntari-files OpenRC service configuration
+# /etc/conf.d/ntari-files
+#
+# ntari-files wraps Samba (SMB) with ROS2 graph health publishing.
+# Samba itself is configured in /etc/ntari/smb.conf.
+
+# Path to the Samba configuration file.
+# The init script writes a default if this does not exist.
+NTARI_FILES_SAMBA_CONF="/etc/ntari/smb.conf"
+
+# Root path for cooperative shared storage.
+# Must match the 'path' in the [cooperative] share section of smb.conf.
+NTARI_FILES_SHARE_ROOT="/var/lib/ntari/shares"
+
+# Health publish interval in seconds
+NTARI_FILES_HEALTH_INTERVAL=30
+
+# ROS2 domain ID for health topic publishing
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"

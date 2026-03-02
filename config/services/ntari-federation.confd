@@ -1,0 +1,24 @@
+# NTARI OS — ntari-federation OpenRC service configuration
+# /etc/conf.d/ntari-federation
+#
+# Configures the inter-cooperative DDS domain bridge.
+# See docs/FEDERATION.md for full setup instructions.
+
+# DDS domain ID used for federation (cross-cooperative) traffic.
+# Domain 0 = local LAN (services). Domain 1 = federation (WireGuard mesh).
+# Do not change unless you have a specific multi-domain reason to.
+NTARI_FED_DOMAIN=1
+
+# Bridge cycle interval in seconds.
+# Topics are re-published between domains at this rate.
+# Recommended: 5s for reliable tunnels, 15s for high-latency links.
+NTARI_FED_INTERVAL=5
+
+# WireGuard interface name (must match ntari-vpn configuration)
+NTARI_VPN_IFACE="wg-ntari"
+
+# Local DDS domain (services, LAN multicast)
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"

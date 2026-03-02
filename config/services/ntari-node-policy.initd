@@ -1,0 +1,137 @@
+#!/sbin/openrc-run
+# NTARI OS — Node Policy Service (ntari_node_policy_node)
+# Phase 10: Hardware Config
+#
+# Runs the ntari-node-policy.sh Python HTTP server on port 8091.
+# Serves the contribution policy web UI at /node/policy (via Caddy reverse proxy).
+# Manages /ntari/node/policy and publishes changes to the DDS graph.
+#
+# URL: http://ntari.local/node/policy
+#      http://<ip>:8080/node/policy
+#
+# Direct (bypassing Caddy):
+#      http://localhost:8091/node/policy
+#
+# Publishes:
+#   /ntari/node/policy   — std_msgs/String : JSON policy document (on change)
+#   /ntari/policy/health — std_msgs/String : healthy | failed
+
+name="ntari-node-policy"
+description="NTARI Node Policy Service — contribution policy UI on port 8091"
+
+NTARI_POLICY_PORT="${NTARI_POLICY_PORT:-8091}"
+NTARI_POLICY_CADDY_CONF="${NTARI_POLICY_CADDY_CONF:-/etc/ntari/Caddyfile}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ntari-node-policy.sh"
+command_background="yes"
+pidfile="/run/ntari-node-policy.pid"
+command_user="root"
+
+output_log="/var/log/ntari/policy.log"
+error_log="/var/log/ntari/policy.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+export NTARI_POLICY_PORT
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-hw-profile
+    after ntari-hw-profile ntari-dns ntari-cache ntari-identity
+    before ntari-web
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /ntari/node
+
+    # Verify Python 3 is available
+    if [ ! -x /usr/bin/python3 ]; then
+        eerror "python3 not found at /usr/bin/python3"
+        return 1
+    fi
+
+    # Verify policy script is present
+    if [ ! -x /usr/local/bin/ntari-node-policy.sh ]; then
+        eerror "ntari-node-policy.sh not found at /usr/local/bin/ntari-node-policy.sh"
+        return 1
+    fi
+
+    # ── Patch Caddyfile to add /node/policy reverse proxy ────────────────────
+    # Done here (start_pre) so Caddy picks it up when ntari-web starts AFTER us.
+    # Guard: skip if proxy is already configured.
+    if [ -f "${NTARI_POLICY_CADDY_CONF}" ] && \
+       ! grep -q "reverse_proxy.*${NTARI_POLICY_PORT}" "${NTARI_POLICY_CADDY_CONF}" 2>/dev/null; then
+
+        einfo "Adding /node/policy reverse proxy to Caddyfile"
+
+        # Append a snippet before the final closing brace of the :8080 block.
+        # We use a temp file + replace to stay busybox sed-safe.
+        local TMP_CADDY
+        TMP_CADDY=$(mktemp)
+        # Read existing Caddyfile; insert policy route before last line containing only '}'
+        awk '
+        /^}[[:space:]]*$/ && !inserted {
+            print "    # Phase 10: Node Policy UI"
+            print "    handle /node/policy* {"
+            print "        reverse_proxy localhost:'"${NTARI_POLICY_PORT}"'"
+            print "    }"
+            inserted=1
+        }
+        { print }
+        ' "${NTARI_POLICY_CADDY_CONF}" > "${TMP_CADDY}" && \
+        cp "${TMP_CADDY}" "${NTARI_POLICY_CADDY_CONF}"
+        rm -f "${TMP_CADDY}"
+    fi
+
+    einfo "Policy server starting on port ${NTARI_POLICY_PORT}"
+}
+
+start_post() {
+    sleep 1
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish policy healthy \
+            "port=${NTARI_POLICY_PORT}" "ui=/node/policy" &
+    fi
+
+    # Health loop: use pgrep -f to find the policy script process specifically
+    # (pgrep -x python3 would match other Python processes)
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-policy-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ntari-node-policy.sh >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish policy healthy \\
+                   port=${NTARI_POLICY_PORT} ui=/node/policy \\
+                   2>/dev/null || true
+                 sleep ${NTARI_POLICY_HEALTH_INTERVAL:-30}
+               done" \
+        >> /var/log/ntari/policy.log 2>&1 || true
+
+    einfo "Node policy UI: http://ntari.local/node/policy"
+    einfo "Health publishing active on /ntari/policy/health"
+}
+
+stop_pre() {
+    einfo "Stopping node policy service"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish policy failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-policy-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-policy-health.pid
+}

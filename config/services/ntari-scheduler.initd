@@ -1,0 +1,142 @@
+#!/sbin/openrc-run
+# NTARI OS — Scheduler Node (ntari_scheduler_node)
+# Phase 11: Contribution Policy
+#
+# Reads /ntari/node/capabilities (hardware profile) and /ntari/node/policy
+# (admin contribution limits), computes cooperative role assignments for this
+# node, writes /ntari/scheduler/roles, and publishes to the DDS graph.
+#
+# Roles: compute (CPU+RAM), storage (disk), relay (network relay)
+#
+# URL: http://ntari.local/scheduler
+#      http://<ip>:8080/scheduler
+#
+# Direct (bypassing Caddy):
+#      http://localhost:8092/scheduler
+#
+# Publishes:
+#   /ntari/scheduler/roles  — std_msgs/String : JSON role assignment document
+#   /ntari/scheduler/health — std_msgs/String : healthy | failed
+
+name="ntari-scheduler"
+description="NTARI Scheduler Node — cooperative role assignment from policy bounds"
+
+NTARI_SCHEDULER_PORT="${NTARI_SCHEDULER_PORT:-8092}"
+NTARI_SCHEDULER_CADDY_CONF="${NTARI_SCHEDULER_CADDY_CONF:-/etc/ntari/Caddyfile}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ntari-scheduler.sh"
+command_background="yes"
+pidfile="/run/ntari-scheduler.pid"
+command_user="root"
+
+output_log="/var/log/ntari/scheduler.log"
+error_log="/var/log/ntari/scheduler.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+export NTARI_SCHEDULER_PORT
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-hw-profile ntari-node-policy
+    after ntari-ntp ntari-hw-profile ntari-node-policy ntari-identity
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /ntari/scheduler
+
+    # Verify Python 3 is available
+    if [ ! -x /usr/bin/python3 ]; then
+        eerror "python3 not found at /usr/bin/python3"
+        return 1
+    fi
+
+    # Verify scheduler script is present
+    if [ ! -x /usr/local/bin/ntari-scheduler.sh ]; then
+        eerror "ntari-scheduler.sh not found at /usr/local/bin/ntari-scheduler.sh"
+        return 1
+    fi
+
+    # ── Patch Caddyfile to add /scheduler/ reverse proxy ─────────────────────
+    # Done here (start_pre) so Caddy picks it up when ntari-web restarts.
+    # Guard: skip if route already configured.
+    if [ -f "${NTARI_SCHEDULER_CADDY_CONF}" ]; then
+        if ! grep -q "reverse_proxy.*${NTARI_SCHEDULER_PORT}" \
+                "${NTARI_SCHEDULER_CADDY_CONF}" 2>/dev/null; then
+
+            einfo "Adding /scheduler/ reverse proxy to Caddyfile"
+            local TMP_CADDY
+            TMP_CADDY=$(mktemp)
+            awk '
+            /^}[[:space:]]*$/ && !inserted {
+                print "    # Phase 11: Scheduler UI"
+                print "    handle /scheduler* {"
+                print "        reverse_proxy localhost:'"${NTARI_SCHEDULER_PORT}"'"
+                print "    }"
+                inserted=1
+            }
+            { print }
+            ' "${NTARI_SCHEDULER_CADDY_CONF}" > "${TMP_CADDY}" && \
+            cp "${TMP_CADDY}" "${NTARI_SCHEDULER_CADDY_CONF}"
+            rm -f "${TMP_CADDY}"
+        else
+            einfo "Caddyfile already has /scheduler/ route"
+        fi
+    else
+        ewarn "Caddyfile not found at ${NTARI_SCHEDULER_CADDY_CONF} — Caddy not configured yet"
+    fi
+
+    einfo "Scheduler node starting (port: ${NTARI_SCHEDULER_PORT})"
+}
+
+start_post() {
+    sleep 2
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish scheduler healthy \
+            "port=${NTARI_SCHEDULER_PORT}" "roles=/ntari/scheduler/roles" &
+    fi
+
+    # Health loop: use pgrep -f to find the scheduler script process specifically
+    # (pgrep -x python3 would match other Python processes on the system)
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-scheduler-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ntari-scheduler.sh >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish scheduler healthy \
+                   port=${NTARI_SCHEDULER_PORT} roles=/ntari/scheduler/roles \
+                   2>/dev/null || true
+                 sleep ${NTARI_SCHEDULER_HEALTH_INTERVAL:-30}
+               done" \
+        >> /var/log/ntari/scheduler.log 2>&1 || true
+
+    einfo "Scheduler node running — http://ntari.local/scheduler"
+    einfo "Role assignments: /ntari/scheduler/roles"
+    einfo "DDS topic: /ntari/scheduler/roles"
+    einfo "Health publishing active on /ntari/scheduler/health"
+}
+
+stop_pre() {
+    einfo "Stopping scheduler node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish scheduler failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-scheduler-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-scheduler-health.pid
+}

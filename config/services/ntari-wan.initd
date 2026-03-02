@@ -1,0 +1,210 @@
+#!/sbin/openrc-run
+# NTARI OS — WAN Node (ntari_wan_node)
+# Phase 12: Internet/Broadcast
+#
+# Configures a WAN (internet-facing) interface, enables IPv4 forwarding,
+# and applies iptables NAT masquerade so the cooperative LAN can reach
+# the internet through this node.
+#
+# Modes:
+#   dhcp   (default) — run udhcpc DHCP client on WAN interface
+#   static           — assign NTARI_WAN_IP/PREFIX/GW from conf.d
+#
+# Config: /etc/conf.d/ntari-wan
+#   NTARI_WAN_IFACE=eth1   — WAN (internet-facing) interface
+#   NTARI_LAN_IFACE=eth0   — LAN (cooperative) interface for NAT source
+#   NTARI_WAN_MODE=dhcp    — dhcp | static
+#   NTARI_WAN_NAT=yes      — enable NAT masquerade
+#
+# Publishes:
+#   /ntari/wan/health  — std_msgs/String : healthy | degraded | failed
+# Note: this service is auto-enabled but fails gracefully if no second NIC.
+
+name="ntari-wan"
+description="NTARI WAN Node — internet connectivity + NAT for the cooperative LAN"
+
+NTARI_WAN_IFACE="${NTARI_WAN_IFACE:-eth1}"
+NTARI_LAN_IFACE="${NTARI_LAN_IFACE:-eth0}"
+NTARI_WAN_MODE="${NTARI_WAN_MODE:-dhcp}"
+NTARI_WAN_NAT="${NTARI_WAN_NAT:-yes}"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    after ntari-ntp ntari-dhcp ntari-dns ntari-cache ntari-identity
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /run/ntari
+
+    # Check WAN interface is present; fail gracefully if not (single-NIC nodes)
+    if ! ip link show "${NTARI_WAN_IFACE}" >/dev/null 2>&1; then
+        eerror "WAN interface ${NTARI_WAN_IFACE} not found"
+        eerror "Connect a second NIC or set NTARI_WAN_IFACE in /etc/conf.d/ntari-wan"
+        return 1
+    fi
+
+    # Enable IPv4 forwarding (required for NAT)
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    mkdir -p /etc/sysctl.d
+    echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/50-ntari-wan.conf
+    einfo "IPv4 forwarding enabled"
+
+    # ── Write WAN health monitor script to /run/ntari/ ────────────────────────
+    # Written here so variable expansion happens at service start time.
+    cat > /run/ntari/wan-monitor.sh << 'WAN_MON_EOF'
+#!/bin/sh
+# WAN connectivity health monitor — called by ntari-wan start_post
+IFACE="${1}"
+INTERVAL="${2:-30}"
+while true; do
+    WAN_IP=$(ip -4 addr show "${IFACE}" 2>/dev/null | awk '/inet /{print $2; exit}')
+    GW=$(ip route list default dev "${IFACE}" 2>/dev/null | awk 'NR==1{print $3}')
+    if [ -n "${WAN_IP}" ]; then
+        STATE="healthy"
+    else
+        STATE="degraded"
+    fi
+    /usr/local/bin/ros2-node-health publish wan "${STATE}" \
+        "iface=${IFACE}" "ip=${WAN_IP:-none}" "gw=${GW:-none}" \
+        2>/dev/null || true
+    sleep "${INTERVAL}"
+done
+WAN_MON_EOF
+    chmod +x /run/ntari/wan-monitor.sh
+}
+
+start() {
+    ebegin "Configuring WAN interface ${NTARI_WAN_IFACE} (${NTARI_WAN_MODE})"
+
+    ip link set "${NTARI_WAN_IFACE}" up
+
+    if [ "${NTARI_WAN_MODE}" = "dhcp" ]; then
+        # udhcpc is included in busybox (all Alpine systems)
+        # -b: background after obtaining first lease; keeps running to renew
+        # -p: PID file for cleanup
+        udhcpc -i "${NTARI_WAN_IFACE}" \
+               -b \
+               -p /run/ntari/udhcpc-wan.pid \
+               2>>/var/log/ntari/wan.log || true
+        sleep 2   # brief wait for initial DHCP lease
+
+    elif [ "${NTARI_WAN_MODE}" = "static" ]; then
+        if [ -z "${NTARI_WAN_IP}" ] || [ -z "${NTARI_WAN_PREFIX}" ] || [ -z "${NTARI_WAN_GW}" ]; then
+            eend 1 "Static mode requires NTARI_WAN_IP, NTARI_WAN_PREFIX, NTARI_WAN_GW in conf.d"
+            return 1
+        fi
+        ip addr flush dev "${NTARI_WAN_IFACE}" 2>/dev/null || true
+        ip addr add "${NTARI_WAN_IP}/${NTARI_WAN_PREFIX}" dev "${NTARI_WAN_IFACE}"
+        ip route replace default via "${NTARI_WAN_GW}" dev "${NTARI_WAN_IFACE}"
+        einfo "Static WAN: ${NTARI_WAN_IP}/${NTARI_WAN_PREFIX} gw ${NTARI_WAN_GW}"
+    else
+        eend 1 "Unknown NTARI_WAN_MODE: ${NTARI_WAN_MODE} (expected: dhcp or static)"
+        return 1
+    fi
+
+    # ── iptables NAT (idempotent: -C check before -A append) ─────────────────
+    if [ "${NTARI_WAN_NAT}" = "yes" ]; then
+        # MASQUERADE: rewrite source IP on outbound WAN traffic
+        iptables -t nat -C POSTROUTING -o "${NTARI_WAN_IFACE}" -j MASQUERADE 2>/dev/null || \
+            iptables -t nat -A POSTROUTING -o "${NTARI_WAN_IFACE}" -j MASQUERADE
+
+        # FORWARD: LAN → WAN new connections
+        iptables -C FORWARD -i "${NTARI_LAN_IFACE}" -o "${NTARI_WAN_IFACE}" -j ACCEPT 2>/dev/null || \
+            iptables -A FORWARD -i "${NTARI_LAN_IFACE}" -o "${NTARI_WAN_IFACE}" -j ACCEPT
+
+        # FORWARD: WAN → LAN established/related return traffic
+        iptables -C FORWARD -i "${NTARI_WAN_IFACE}" -o "${NTARI_LAN_IFACE}" \
+                 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+            iptables -A FORWARD -i "${NTARI_WAN_IFACE}" -o "${NTARI_LAN_IFACE}" \
+                 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+        einfo "NAT masquerade active: ${NTARI_LAN_IFACE} → ${NTARI_WAN_IFACE}"
+    fi
+
+    eend 0
+}
+
+start_post() {
+    sleep 1
+
+    # Publish initial health
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        local WAN_IP
+        WAN_IP=$(ip -4 addr show "${NTARI_WAN_IFACE}" 2>/dev/null | \
+                 awk '/inet /{print $2; exit}')
+        local STATE="degraded"
+        [ -n "${WAN_IP}" ] && STATE="healthy"
+        ros2-node-health publish wan "${STATE}" \
+            "iface=${NTARI_WAN_IFACE}" "ip=${WAN_IP:-none}" "mode=${NTARI_WAN_MODE}" &
+    fi
+
+    # Start WAN health monitor loop (checks interface IP every interval)
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-wan-health.pid \
+        --exec /run/ntari/wan-monitor.sh \
+        -- "${NTARI_WAN_IFACE}" "${NTARI_WAN_HEALTH_INTERVAL:-30}" \
+        >> /var/log/ntari/wan.log 2>&1 || true
+
+    local WAN_IP
+    WAN_IP=$(ip -4 addr show "${NTARI_WAN_IFACE}" 2>/dev/null | \
+             awk '/inet /{print $2; exit}')
+    if [ -n "${WAN_IP}" ]; then
+        einfo "WAN active: ${WAN_IP} on ${NTARI_WAN_IFACE}"
+    else
+        ewarn "WAN interface up — DHCP lease pending (check /var/log/ntari/wan.log)"
+    fi
+    einfo "Health publishing active on /ntari/wan/health"
+}
+
+stop_pre() {
+    einfo "Stopping WAN node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish wan failed "reason=service_stopped" || true
+    fi
+
+    # Kill health monitor loop
+    start-stop-daemon --stop --pidfile /run/ntari-wan-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-wan-health.pid
+}
+
+stop() {
+    ebegin "Removing WAN configuration"
+
+    # Remove iptables NAT rules (errors ignored — rules may not exist on clean stop)
+    if [ "${NTARI_WAN_NAT}" = "yes" ]; then
+        iptables -t nat -D POSTROUTING -o "${NTARI_WAN_IFACE}" -j MASQUERADE 2>/dev/null || true
+        iptables -D FORWARD -i "${NTARI_LAN_IFACE}" -o "${NTARI_WAN_IFACE}" -j ACCEPT 2>/dev/null || true
+        iptables -D FORWARD -i "${NTARI_WAN_IFACE}" -o "${NTARI_LAN_IFACE}" \
+                 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+    fi
+
+    # Kill DHCP client if running
+    if [ -f /run/ntari/udhcpc-wan.pid ]; then
+        kill "$(cat /run/ntari/udhcpc-wan.pid)" 2>/dev/null || true
+        rm -f /run/ntari/udhcpc-wan.pid
+    fi
+
+    # Release address and bring interface down
+    ip addr flush dev "${NTARI_WAN_IFACE}" 2>/dev/null || true
+    ip link set "${NTARI_WAN_IFACE}" down 2>/dev/null || true
+
+    eend 0
+}

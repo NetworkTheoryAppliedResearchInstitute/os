@@ -1,0 +1,119 @@
+#!/sbin/openrc-run
+# NTARI OS — NTP Node (ntari_ntp_node)
+# Phase 7: Services Layer
+#
+# Wraps Chrony (chronyd) as a ROS2 lifecycle node.
+# Chrony is the system NTP daemon for NTARI OS (already configured in Phase 1).
+# This node adds DDS graph visibility: it publishes the sync state and stratum
+# to /ntari/ntp/health and /ntari/ntp/status so the globe interface can show
+# clock synchronization status across the cooperative mesh.
+#
+# NTP is critical for DDS QoS timestamps — clocks that drift > ~100ms can
+# cause DDS discovery failures and topic ordering anomalies.
+#
+# Boot dependencies:
+#   - Requires net (Chrony needs network to reach NTP servers)
+#   - After ros2-domain (so we can publish to DDS immediately on start)
+#   - Before ALL other services that depend on synchronized clocks (dns, web, etc.)
+#
+# IMPORTANT: This service manages Chrony via rc-service; it does not
+# replace the chrony OpenRC service.  chronyd MUST already be installed.
+
+name="ntari-ntp"
+description="NTARI NTP Node — Chrony sync state + ROS2 health publishing"
+
+# This service does not start its own long-running command — it supervises
+# chronyd (via OpenRC dependency chain) and runs a health publishing loop.
+# We use start-stop-daemon for the health loop process.
+command="/usr/local/bin/ros2-node-health"
+command_args="loop ntp ${NTARI_NTP_HEALTH_INTERVAL:-30} chronyd"
+command_background="yes"
+pidfile="/run/ntari-ntp-health.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ntp.log"
+error_log="/var/log/ntari/ntp.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    # chronyd must run alongside us; we supervise its health state.
+    # Use 'need' so OpenRC will start chronyd if it isn't running.
+    need chronyd
+    # NTP must be up before DNS and other services so clocks are
+    # sane by the time higher-level protocols establish sessions.
+    before ntari-dns ntari-web ntari-cache
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+
+    # Verify ros2-node-health helper exists
+    if [ ! -x /usr/local/bin/ros2-node-health ]; then
+        eerror "ros2-node-health not found at /usr/local/bin/ros2-node-health"
+        eerror "This script is part of NTARI OS scripts; check build-iso.sh overlay."
+        return 1
+    fi
+
+    # Verify chronyd is installed
+    if ! command -v chronyd >/dev/null 2>&1; then
+        eerror "chronyd not found — install via: apk add chrony"
+        return 1
+    fi
+
+    # Read current Chrony tracking state for the startup log
+    STRATUM="unknown"
+    SYNC_STATE="unknown"
+    if command -v chronyc >/dev/null 2>&1; then
+        STRATUM=$(chronyc tracking 2>/dev/null | awk '/^Stratum/ {print $3}' || echo "unknown")
+        REF_TIME=$(chronyc tracking 2>/dev/null | awk '/^Reference time/ {print $4, $5}' || echo "")
+        SYNC_STATE=$(chronyc tracking 2>/dev/null | awk '/^Leap status/ {$1=""; $2=""; print}' \
+                     | sed 's/^ *//' || echo "unknown")
+    fi
+
+    einfo "NTP node starting (chronyd, stratum: ${STRATUM}, sync: ${SYNC_STATE})"
+}
+
+start_post() {
+    # Brief pause; the health loop command will start via ssd (command_background)
+    sleep 1
+
+    # Publish initial health immediately (outside the loop)
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        STRATUM="unknown"
+        if command -v chronyc >/dev/null 2>&1; then
+            STRATUM=$(chronyc tracking 2>/dev/null | awk '/^Stratum/ {print $3}' || echo "unknown")
+        fi
+        HEALTH_STATE="healthy"
+        # Stratum 16 = unsynchronized in NTP convention
+        [ "${STRATUM}" = "16" ] && HEALTH_STATE="degraded"
+        ros2-node-health publish ntp "${HEALTH_STATE}" \
+            "backend=chronyd" "stratum=${STRATUM}" &
+    fi
+
+    einfo "NTP node running — health publishing on /ntari/ntp/health (every ${NTARI_NTP_HEALTH_INTERVAL:-30}s)"
+}
+
+stop_pre() {
+    einfo "Stopping NTP node health publisher"
+
+    # Publish failed state before shutdown
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish ntp failed "reason=service_stopped" || true
+    fi
+}

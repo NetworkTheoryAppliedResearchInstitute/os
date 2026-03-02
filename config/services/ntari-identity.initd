@@ -1,0 +1,240 @@
+#!/sbin/openrc-run
+# NTARI OS — Identity Node (ntari_identity_node)
+# Phase 7: Services Layer
+#
+# Provides cooperative identity management via OpenLDAP (slapd).
+# Listens on localhost:389 only — not exposed to the cooperative network.
+# Provides a minimal LDAP directory for node and user identity.
+#
+# Directory structure:
+#   dc=ntari,dc=local          — root
+#   ou=nodes,dc=ntari,dc=local — cooperative node entries
+#   ou=users,dc=ntari,dc=local — local user entries
+#
+# Admin DN:      cn=admin,dc=ntari,dc=local
+# Admin password: derived from node UUID (regenerated if absent)
+#
+# Publishes:
+#   /ntari/identity/health  — std_msgs/String : healthy | degraded | failed
+#
+# Boot dependencies:
+#   - Requires ros2-domain (DDS graph up)
+#   - Requires net
+#   - After ntari-ntp (LDAP auth is clock-sensitive; good time sync matters)
+#   - After ntari-vpn (federation identity uses VPN)
+#   - Before ntari-files (Samba can use LDAP for auth)
+#   - Before ntari-web
+
+name="ntari-identity"
+description="NTARI Identity Node — OpenLDAP slapd + ROS2 health publishing"
+
+LDAP_CONF="${NTARI_IDENTITY_LDAP_CONF:-/etc/ntari/ldap/slapd.conf}"
+LDAP_DATA="${NTARI_IDENTITY_LDAP_DATA:-/var/lib/ntari/ldap}"
+LDAP_PORT="${NTARI_IDENTITY_LDAP_PORT:-389}"
+
+# slapd self-daemonizes and writes its own PID file.
+# Use the same pattern as ntari-dhcp (kea): omit command_background="yes"
+# and let slapd manage its own pidfile.
+command="/usr/sbin/slapd"
+command_args="-u ldap -h ldap://127.0.0.1:${LDAP_PORT}/ -f ${LDAP_CONF}"
+pidfile="/run/openldap/slapd.pid"
+command_user="root"
+
+output_log="/var/log/ntari/identity.log"
+error_log="/var/log/ntari/identity.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-ntp
+    after ntari-vpn
+    before ntari-files ntari-web
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /run/openldap "${LDAP_DATA}" "$(dirname "${LDAP_CONF}")"
+
+    # Verify slapd binary
+    if [ ! -x /usr/sbin/slapd ]; then
+        eerror "slapd not found at /usr/sbin/slapd"
+        eerror "Install via: apk add openldap-server"
+        return 1
+    fi
+
+    # Ensure ldap user/group exist
+    if ! id ldap >/dev/null 2>&1; then
+        addgroup -S ldap 2>/dev/null || true
+        adduser -S -D -H -h "${LDAP_DATA}" -G ldap ldap 2>/dev/null || true
+    fi
+    chown ldap:ldap /run/openldap "${LDAP_DATA}" 2>/dev/null || true
+
+    # Read or generate node UUID (for admin password derivation)
+    local uuid_file="/var/lib/ntari/identity/node-uuid"
+    mkdir -p "$(dirname "${uuid_file}")"
+    if [ ! -f "${uuid_file}" ]; then
+        cat /proc/sys/kernel/random/uuid 2>/dev/null > "${uuid_file}" || \
+            tr -dc 'a-f0-9' < /dev/urandom | head -c 32 | \
+            sed 's/\(.\{8\}\)\(.\{4\}\)\(.\{4\}\)\(.\{4\}\)\(.\{12\}\)/\1-\2-\3-\4-\5/' \
+            > "${uuid_file}"
+    fi
+    local NODE_UUID
+    NODE_UUID=$(cat "${uuid_file}")
+
+    # Write slapd.conf if absent
+    if [ ! -f "${LDAP_CONF}" ]; then
+        einfo "Writing default slapd.conf: ${LDAP_CONF}"
+
+        # Derive admin password from node UUID
+        local ADMIN_PASS
+        ADMIN_PASS=$(printf '%s-ntari-identity' "${NODE_UUID}" | sha256sum | cut -c1-32)
+        local HASHED_PASS
+        HASHED_PASS=$(slappasswd -h '{SSHA}' -s "${ADMIN_PASS}" 2>/dev/null || \
+                      printf '{SHA}%s' "$(printf '%s' "${ADMIN_PASS}" | sha1sum | cut -c1-40)")
+
+        # Detect schema paths (Alpine puts schemas under /etc/openldap/schema/)
+        local SCHEMA_DIR="/etc/openldap/schema"
+        [ -d "${SCHEMA_DIR}" ] || SCHEMA_DIR="/usr/share/openldap/schema"
+
+        cat > "${LDAP_CONF}" <<SLAPD_EOF
+# NTARI OS — OpenLDAP configuration
+# /etc/ntari/ldap/slapd.conf
+# Auto-generated from node UUID — edit with care.
+
+include ${SCHEMA_DIR}/core.schema
+include ${SCHEMA_DIR}/cosine.schema
+include ${SCHEMA_DIR}/inetorgperson.schema
+
+pidfile     /run/openldap/slapd.pid
+argsfile    /run/openldap/slapd.args
+loglevel    none
+
+# MDB (Memory-Mapped Database) — efficient for edge hardware
+database    mdb
+suffix      "dc=ntari,dc=local"
+rootdn      "cn=admin,dc=ntari,dc=local"
+rootpw      ${HASHED_PASS}
+directory   ${LDAP_DATA}
+maxsize     104857600
+
+# Restrict all access to localhost only
+access to *
+    by peername.ip=127.0.0.1 write
+    by * none
+SLAPD_EOF
+        chmod 640 "${LDAP_CONF}"
+        chown root:ldap "${LDAP_CONF}" 2>/dev/null || true
+
+        # Store admin password (plaintext, root-only) for service use
+        printf '%s' "${ADMIN_PASS}" > "$(dirname "${LDAP_CONF}")/admin.passwd"
+        chmod 600 "$(dirname "${LDAP_CONF}")/admin.passwd"
+    fi
+
+    # Bootstrap the DIT on first run (marker file guards re-runs)
+    local BOOTSTRAP_DONE="${LDAP_DATA}/.bootstrapped"
+    if [ ! -f "${BOOTSTRAP_DONE}" ]; then
+        einfo "Bootstrapping NTARI LDAP directory (dc=ntari,dc=local)"
+
+        local NODE_UUID
+        NODE_UUID=$(cat /var/lib/ntari/identity/node-uuid 2>/dev/null || echo "unknown")
+        local HOSTNAME
+        HOSTNAME=$(hostname 2>/dev/null || echo "ntari-node")
+
+        local TMP_LDIF="/tmp/ntari-ldap-bootstrap.ldif"
+        cat > "${TMP_LDIF}" <<LDIF_EOF
+# Root entry
+dn: dc=ntari,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: NTARI Cooperative
+dc: ntari
+
+# Nodes OU
+dn: ou=nodes,dc=ntari,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: nodes
+description: NTARI cooperative node entries
+
+# Users OU
+dn: ou=users,dc=ntari,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: users
+description: NTARI local user entries
+
+# This node's entry
+dn: cn=${HOSTNAME},ou=nodes,dc=ntari,dc=local
+objectClass: top
+objectClass: device
+cn: ${HOSTNAME}
+description: NTARI node uuid=${NODE_UUID}
+LDIF_EOF
+
+        if slapadd -f "${LDAP_CONF}" -l "${TMP_LDIF}" 2>/dev/null; then
+            touch "${BOOTSTRAP_DONE}"
+            chown -R ldap:ldap "${LDAP_DATA}" 2>/dev/null || true
+            einfo "LDAP directory bootstrapped"
+        else
+            ewarn "slapadd bootstrap failed — directory may be partially initialised"
+            touch "${BOOTSTRAP_DONE}"
+        fi
+        rm -f "${TMP_LDIF}"
+    fi
+
+    # Validate config syntax
+    if ! slaptest -f "${LDAP_CONF}" -u >/dev/null 2>&1; then
+        eerror "slapd.conf validation failed: ${LDAP_CONF}"
+        slaptest -f "${LDAP_CONF}" -u
+        return 1
+    fi
+
+    einfo "Identity node starting (slapd, port: ${LDAP_PORT}, base: dc=ntari,dc=local)"
+}
+
+start_post() {
+    sleep 1
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish identity healthy \
+            "backend=openldap" "port=${LDAP_PORT}" "base=dc=ntari,dc=local" &
+    fi
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        start-stop-daemon --start --background \
+            --make-pidfile --pidfile /run/ntari-identity-health.pid \
+            --exec /usr/local/bin/ros2-node-health \
+            -- loop identity "${NTARI_IDENTITY_HEALTH_INTERVAL:-30}" slapd \
+            >> /var/log/ntari/identity.log 2>&1 || true
+    fi
+
+    einfo "Identity node running — LDAP at ldap://127.0.0.1:${LDAP_PORT}/"
+    einfo "Base DN: dc=ntari,dc=local | Admin: cn=admin,dc=ntari,dc=local"
+    einfo "Health publishing active on /ntari/identity/health"
+}
+
+stop_pre() {
+    einfo "Stopping identity node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish identity failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-identity-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-identity-health.pid
+}

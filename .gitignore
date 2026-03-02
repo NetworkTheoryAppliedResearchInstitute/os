@@ -1,0 +1,68 @@
+# NTARI OS - Git Ignore File
+
+# Build outputs
+build-output/
+dist/
+!build/*.sh
+!build/*.md
+!build/README.md
+*.iso
+*.img
+*.dmg
+*.exe
+*.AppImage
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets
+*.key
+*.pem
+secrets/
+.env
+
+# Test outputs
+coverage/
+.pytest_cache/
+test-results/
+
+# Package managers
+package-lock.json
+yarn.lock
+Cargo.lock
+
+# Alpine build artifacts
+work/
+cache/
+*.apk
+
+# USB installer artifacts
+installer/dist/
+installer/build/
+installer/.cache/
+
+# Hardware configs (generated)
+hardware/output/
+
+# Windows reserved device name (cannot be tracked by git)
+nul

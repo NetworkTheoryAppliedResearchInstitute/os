@@ -1,0 +1,68 @@
+#!/sbin/openrc-run
+# NTARI OS — Kernel Module Path Fix (ntari-modloop)
+#
+# Alpine 3.23 live ISO modloop squashfs has modules at:
+#   modules/<kernel-version>/   (inside squashfs root)
+# After Alpine initramfs mounts modloop at /lib/modules/, the path becomes:
+#   /lib/modules/modules/<kernel-version>/
+# but modprobe expects:
+#   /lib/modules/<kernel-version>/
+#
+# This service detects the extra nesting and applies a bind-mount fix,
+# then loads essential NIC drivers so networking comes up normally.
+#
+# Boot placement: sysinit runlevel, BEFORE net.
+# No ROS2 dependency — runs on both 'server' and 'ros2' editions.
+
+name="ntari-modloop"
+description="Alpine modloop nesting fix + essential driver loader"
+
+# One-shot: no command supervision — custom start()/stop() only.
+
+depend() {
+    keyword -docker -lxc -vserver
+    before net networking
+    after sysfs
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+}
+
+start() {
+    ebegin "Checking kernel module paths"
+
+    local kver
+    kver=$(uname -r)
+    local nested="/lib/modules/modules/${kver}"
+    local target="/lib/modules/${kver}"
+
+    if [ -d "${target}" ] && [ -f "${target}/modules.dep" ]; then
+        einfo "Module path OK: ${target}"
+    elif [ -d "${nested}" ]; then
+        einfo "Extra nesting detected — applying bind-mount fix"
+        mkdir -p "${target}"
+        if mount --bind "${nested}" "${target}" 2>/dev/null; then
+            einfo "Bind-mounted: ${nested} -> ${target}"
+            depmod -a "${kver}" 2>/dev/null || true
+        else
+            ewarn "Bind-mount failed — will attempt direct modprobe anyway"
+        fi
+    else
+        ewarn "No module directory found for kernel ${kver} — skipping fix"
+    fi
+
+    # Load common NIC drivers regardless (module may already be built-in or loaded)
+    einfo "Loading essential NIC drivers"
+    for mod in e1000 e1000e virtio_net vmxnet3 r8169 igb ixgbe; do
+        modprobe "${mod}" 2>/dev/null && einfo "  loaded: ${mod}" || true
+    done
+
+    eend 0
+}
+
+stop() {
+    # Bind-mount stays active for the session lifetime (correct behaviour).
+    # No cleanup needed at shutdown — the mount point is ephemeral on live media.
+    eend 0
+}

@@ -1,0 +1,129 @@
+# Maintainer: Network Theory Applied Research Institute <dev@ntari.org>
+# Contributor: SEQSENSE Inc. (original alpine-ros aports infrastructure)
+#
+# NTARI OS — Cyclone DDS APK with musl thread stack patch
+#
+# This APKBUILD builds Cyclone DDS for Alpine Linux (musl libc).
+#
+# The key difference from an unpatched build is the musl thread stack
+# size fix: musl's default thread stack is 128KB vs glibc's 2-10MB.
+# Cyclone DDS internal threads (discovery, transport, serialization)
+# can overflow on musl without explicit stack size settings.
+#
+# Fix applied: dds/src/core/os/src/posix/os_thread_posix.c
+#   Each call to pthread_create() for a DDS-internal thread is preceded
+#   by pthread_attr_setstacksize(&attr, 4*1024*1024) — 4MB, sufficient
+#   for all known DDS workloads on edge hardware.
+#
+# This is a belt-and-suspenders complement to the CycloneDDS XML config
+# at /etc/ntari/cyclonedds.xml which sets conservative message sizes.
+#
+# musl compatibility status (see docs/ROS2_MUSL_COMPATIBILITY.md):
+#   execinfo.h guard   — fixed upstream (PR #384); in source tree
+#   thread stack size  — THIS PATCH (no upstream fix exists)
+#   dlclose() no-op    — musl design decision; plugin lifecycle managed
+#   symbol resolution  — build natively on Alpine (this APKBUILD does that)
+#
+# Package version tracks Cyclone DDS upstream release series.
+# Check https://github.com/eclipse-cyclonedds/cyclonedds/releases
+
+pkgname=cyclonedds
+pkgver=0.10.5
+pkgrel=1
+pkgdesc="Eclipse Cyclone DDS — musl-patched build for NTARI OS (Alpine 3.23)"
+url="https://cyclonedds.io"
+arch="x86_64 aarch64"
+license="EPL-2.0"
+depends="openssl"
+makedepends="
+    cmake
+    samurai
+    openssl-dev
+    bison
+    flex
+"
+# Note: python3 bindings (cyclonedds-python) are separate; not built here.
+# ROS2 uses the C library (libddsc) and the C++ idlc-generated layer.
+source="
+    cyclonedds-${pkgver}.tar.gz::https://github.com/eclipse-cyclonedds/cyclonedds/archive/refs/tags/${pkgver}.tar.gz
+    0001-musl-thread-stack-size.patch
+"
+builddir="$srcdir/cyclonedds-${pkgver}"
+
+# SHA-256 checksums — update these when bumping pkgver.
+# Generate: sha256sum cyclonedds-X.Y.Z.tar.gz
+# (left blank here; fill in at build time or use `abuild checksum`)
+sha256sums="
+SKIP
+SKIP
+"
+
+prepare() {
+    default_prepare
+    cd "$builddir"
+
+    # Verify the musl thread stack patch applies cleanly.
+    # If this fails, the upstream source has changed; review and update the patch.
+    patch -p1 --dry-run < "${srcdir}/0001-musl-thread-stack-size.patch" \
+        || { echo "ERROR: musl thread stack patch does not apply cleanly"; exit 1; }
+    patch -p1 < "${srcdir}/0001-musl-thread-stack-size.patch"
+}
+
+build() {
+    cd "$builddir"
+
+    # Build Cyclone DDS natively on Alpine.
+    # IMPORTANT: Do NOT cross-compile or use glibc-built artifacts.
+    # musl's no-lazy-symbol-binding means glibc-compiled .so files fail
+    # at dlopen() with "symbol not found" for glibc-internal symbols.
+    # See §2.3 of docs/ROS2_MUSL_COMPATIBILITY.md.
+
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/ros/jazzy \
+        -DBUILD_SHARED_LIBS=ON \
+        -DENABLE_SSL=ON \
+        -DENABLE_SECURITY=OFF \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=OFF \
+        -DCMAKE_C_FLAGS="-D_GNU_SOURCE=1" \
+        .
+
+    cmake --build build
+}
+
+check() {
+    # Tests require a running DDS network; skip in build environment.
+    # Integration tests are run separately in a VM via tests/integration/.
+    true
+}
+
+package() {
+    cd "$builddir"
+    DESTDIR="$pkgdir" cmake --install build
+
+    # Install license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+    # Patch provenance: record that this build includes the NTARI musl patch
+    install -Dm644 /dev/stdin \
+        "$pkgdir/usr/share/doc/$pkgname/NTARI_PATCH_NOTES.txt" <<EOF
+NTARI OS Cyclone DDS Build Notes
+Package: ${pkgname}-${pkgver}-r${pkgrel}
+Build date: $(date -u +%Y-%m-%d)
+
+Applied patch: 0001-musl-thread-stack-size.patch
+  Sets explicit thread stack size (4MB) via pthread_attr_setstacksize()
+  before each DDS internal pthread_create() call.
+  Addresses musl libc default stack of 128KB (vs glibc 2-10MB).
+  See: docs/ROS2_MUSL_COMPATIBILITY.md section 2.4
+
+No upstream fix exists for this issue in Cyclone DDS.
+This patch should be re-evaluated on each pkgver bump.
+
+Source: https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os
+License: AGPL-3.0 (NTARI OS project)
+Cyclone DDS license: EPL-2.0
+EOF
+}

@@ -1,0 +1,3058 @@
+# NTARI OS v1.4 - NEW SECTIONS TO ADD
+# Insert these sections before Section 12 (Appendices)
+
+---
+
+## 13. Hardware Compatibility & Support
+
+### 13.1 Hardware Compatibility List (HCL)
+
+**Purpose**: Provide users with verified hardware compatibility before installation to reduce abandonment rates.
+
+**Compatibility Tiers**:
+- **Gold**: Fully supported, all features work out-of-box
+- **Silver**: Supported with additional drivers (installed automatically)
+- **Bronze**: Supported with manual configuration
+- **Incompatible**: Known to not work
+
+---
+
+#### 13.1.1 Tested Desktop Configurations
+
+**GOLD TIER** (100% Compatible Out-of-Box):
+
+| Manufacturer | Model | CPU | RAM | WiFi | GPU | Notes |
+|--------------|-------|-----|-----|------|-----|-------|
+| Dell | OptiPlex 7050 | i5-7500 | 16GB DDR4 | Intel 8265 | Intel HD 630 | Perfect |
+| Dell | OptiPlex 3070 | i5-9500 | 8GB DDR4 | Intel 9560 | Intel UHD 630 | Perfect |
+| HP | EliteDesk 800 G3 | i7-7700 | 16GB DDR4 | Intel 8265 | Intel HD 630 | Perfect |
+| HP | ProDesk 600 G5 | i5-9500 | 8GB DDR4 | Intel 9560 | Intel UHD 630 | Perfect |
+| Lenovo | ThinkCentre M720q | i5-8500T | 8GB DDR4 | Intel 9560 | Intel UHD 630 | Reference platform |
+| Lenovo | ThinkCentre M90n | i5-8365U | 16GB DDR4 | Intel 9560 | Intel UHD 620 | Perfect |
+| ASUS | PN50 | Ryzen 7 4700U | 16GB DDR4 | MediaTek MT7921 | AMD Vega 7 | Perfect |
+| Intel | NUC10i5FNH | i5-10210U | 16GB DDR4 | Intel AX201 | Intel UHD | Perfect |
+
+**SILVER TIER** (Requires Auto-Installed Firmware):
+
+| Manufacturer | Model | CPU | RAM | WiFi | GPU | Required Package |
+|--------------|-------|-----|-----|------|-----|------------------|
+| Dell | Inspiron 15 3000 | i3-7100U | 4GB DDR4 | Realtek 8821CE | Intel HD 620 | rtl8821ce-dkms |
+| HP | Pavilion 15 | i5-8250U | 8GB DDR4 | Realtek 8822CE | Intel UHD 620 | rtl8822ce-dkms |
+| Lenovo | IdeaPad 330 | i5-8250U | 8GB DDR4 | Qualcomm QCA9377 | Intel UHD 620 | ath10k-firmware |
+| ASUS | VivoBook S15 | i7-8550U | 8GB DDR4 | Realtek 8822CE | NVIDIA MX150 | rtl8822ce + nvidia |
+| Acer | Aspire 5 | i5-8265U | 8GB DDR4 | Intel 9560 | NVIDIA MX230 | nvidia-driver |
+
+**BRONZE TIER** (Manual Configuration May Be Needed):
+
+| Manufacturer | Model | CPU | RAM | WiFi | GPU | Configuration |
+|--------------|-------|-----|-----|------|-----|---------------|
+| MSI | GF63 | i5-9300H | 8GB DDR4 | Intel AX200 | NVIDIA GTX 1650 | Manual NVIDIA install |
+| ASUS | ROG Strix | i7-9750H | 16GB DDR4 | Intel AX200 | NVIDIA RTX 2060 | NVIDIA + optimus |
+| Older Macs | MacBook Pro 2015 | i5-5257U | 8GB DDR3 | Broadcom BCM4360 | Intel Iris 6100 | Broadcom firmware |
+
+**INCOMPATIBLE** (Known Issues):
+
+| Hardware | Issue | Workaround |
+|----------|-------|------------|
+| Broadcom BCM4352 (some variants) | Driver conflicts | Use USB WiFi adapter |
+| NVIDIA Optimus (some laptops) | Hybrid graphics issues | Disable discrete GPU in BIOS |
+| Realtek RTL8188EU (old USB WiFi) | No Alpine driver | Use different USB adapter |
+| Very old CPUs (pre-2008) | 64-bit requirement | Use 32-bit Lite Edition (if available) |
+
+---
+
+#### 13.1.2 WiFi Chipset Compatibility Matrix
+
+**EXCELLENT** (Works Out-of-Box):
+- Intel 9560, 9462, 9260, 8265, 8260, 7265, 7260
+- Intel AX200, AX201, AX210 (WiFi 6)
+- Qualcomm Atheros AR9485, AR9462, AR9287
+- MediaTek MT7921 (WiFi 6E)
+
+**GOOD** (Requires linux-firmware Package):
+- Realtek RTL8821CE, RTL8822CE, RTL8723DE
+- Qualcomm Atheros QCA9377, QCA6174
+- Broadcom BCM4331, BCM4360, BCM43602
+
+**REQUIRES MANUAL DRIVER**:
+- Broadcom BCM4352 (older MacBooks)
+- Some Realtek USB adapters
+
+**INCOMPATIBLE**:
+- Realtek RTL8188EU (USB, very old)
+- Broadcom BCM4311 (very old)
+
+---
+
+#### 13.1.3 GPU Compatibility
+
+**INTEL INTEGRATED** (Excellent Support):
+- All Intel HD Graphics (Gen 6-12)
+- All Intel UHD Graphics
+- All Intel Iris Graphics
+- Driver: `xf86-video-intel` (included by default)
+
+**AMD INTEGRATED** (Excellent Support):
+- AMD Vega (Ryzen APUs)
+- AMD Radeon (Ryzen 5000/6000/7000 series)
+- Driver: `xf86-video-amdgpu` (included by default)
+
+**NVIDIA DISCRETE** (Good Support with Proprietary Driver):
+- GeForce GTX 10-series, 16-series, 20-series, 30-series, 40-series
+- Driver: `nvidia-driver` (must be installed, not included by default)
+- Open-source alternative: `nouveau` (included, but limited 3D performance)
+
+**AMD DISCRETE** (Excellent Support):
+- Radeon RX 5000, 6000, 7000 series
+- Driver: `xf86-video-amdgpu` (included by default)
+
+**NVIDIA OPTIMUS LAPTOPS** (Complicated):
+- Hybrid graphics (Intel + NVIDIA)
+- Recommendation: Disable discrete GPU in BIOS for best compatibility
+- Advanced: Use `nvidia-prime` for switching
+
+---
+
+#### 13.1.4 Raspberry Pi Support
+
+**OFFICIAL SUPPORT**:
+- Raspberry Pi 4 Model B (2GB, 4GB, 8GB) - GOLD
+- Raspberry Pi 3 Model B+ - SILVER
+- Raspberry Pi 3 Model B - BRONZE
+- Raspberry Pi 5 - GOLD (when available)
+
+**NOT SUPPORTED**:
+- Raspberry Pi Zero/Zero W (insufficient RAM)
+- Raspberry Pi 2 (ARMv7, possible future support)
+- Raspberry Pi 1 (too old)
+
+**Image Size**:
+- Server Edition: 180MB compressed, 512MB extracted
+- Lite Edition: 400MB compressed, 1.2GB extracted
+- Desktop Edition: Not recommended for Pi (use Lite)
+
+---
+
+### 13.2 Pre-Installation Compatibility Checker
+
+**Tool Name**: `ntari-compat-check`
+
+**Availability**:
+- Windows: `NTARI-Compatibility-Checker.exe`
+- macOS: `NTARI-Compatibility-Checker.app`
+- Linux: `ntari-compat-check` (AppImage)
+
+**Download**: https://ntari.org/compatibility
+
+---
+
+#### 13.2.1 Detection Logic
+
+**Hardware Detection**:
+```python
+#!/usr/bin/env python3
+# NTARI Compatibility Checker
+
+import platform
+import subprocess
+import json
+
+class HardwareChecker:
+    def __init__(self):
+        self.os = platform.system()
+        self.results = {
+            'cpu': None,
+            'ram': None,
+            'storage': None,
+            'wifi': None,
+            'gpu': None,
+            'compatibility_score': 0
+        }
+
+    def check_cpu(self):
+        """Detect CPU and verify minimum requirements"""
+        if self.os == "Linux":
+            # Use lscpu
+            output = subprocess.check_output(['lscpu'], text=True)
+            # Parse CPU model, cores, architecture
+        elif self.os == "Windows":
+            # Use WMI
+            import wmi
+            w = wmi.WMI()
+            cpu = w.Win32_Processor()[0]
+            return {
+                'model': cpu.Name,
+                'cores': cpu.NumberOfCores,
+                'threads': cpu.NumberOfLogicalProcessors,
+                'arch': cpu.Architecture  # 9 = x64
+            }
+        elif self.os == "Darwin":  # macOS
+            # Use system_profiler
+            output = subprocess.check_output(
+                ['system_profiler', 'SPHardwareDataType', '-json'],
+                text=True
+            )
+            data = json.loads(output)
+            # Parse CPU info
+
+    def check_wifi(self):
+        """Detect WiFi chipset and check compatibility"""
+        # Linux: lspci | grep -i network
+        # Windows: WMI Win32_NetworkAdapter
+        # macOS: system_profiler SPNetworkDataType
+        pass
+
+    def check_compatibility(self):
+        """Calculate overall compatibility score"""
+        score = 0
+
+        # CPU: 30 points
+        if cpu_meets_minimum:
+            score += 30
+
+        # RAM: 20 points
+        if ram >= 4GB:
+            score += 20
+        elif ram >= 2GB:
+            score += 15
+
+        # Storage: 15 points
+        if storage >= 50GB:
+            score += 15
+
+        # WiFi: 20 points
+        if wifi_chipset in EXCELLENT_CHIPSETS:
+            score += 20
+        elif wifi_chipset in GOOD_CHIPSETS:
+            score += 15
+
+        # GPU: 15 points
+        if gpu_type == 'intel_integrated':
+            score += 15
+        elif gpu_type == 'nvidia':
+            score += 10
+
+        return score
+
+    def recommend_edition(self):
+        """Recommend which edition to install"""
+        if self.cpu_cores >= 4 and self.ram >= 4:
+            return "Desktop Edition"
+        elif self.ram >= 2:
+            return "Lite Edition"
+        else:
+            return "Server Edition (headless)"
+```
+
+---
+
+#### 13.2.2 Checker Output
+
+**Example Report**:
+```
+═══════════════════════════════════════════════════════════
+NTARI OS Compatibility Checker v1.0
+═══════════════════════════════════════════════════════════
+
+Scanning your hardware...
+
+✓ CPU: Intel Core i5-8500T (6 cores, 8 threads)
+  └ Excellent - Exceeds minimum requirements
+  └ TDP: 35W (power efficient)
+
+✓ RAM: 8GB DDR4-2666
+  └ Recommended for Desktop Edition
+
+✓ Storage: 256GB NVMe SSD (Samsung 970 EVO)
+  └ Plenty of space available
+  └ Fast NVMe will improve performance
+
+⚠ WiFi: Realtek RTL8822CE
+  └ GOOD - Requires firmware package
+  └ Will be installed automatically during setup
+  └ No action needed
+
+✓ GPU: Intel UHD Graphics 630
+  └ Excellent - Fully supported out-of-box
+
+✓ Ethernet: Intel I219-LM Gigabit
+  └ Excellent - Full support
+
+✓ Audio: Realtek ALC233
+  └ Supported
+
+✓ Bluetooth: Intel Wireless-AC 9560
+  └ Excellent - Full support
+
+═══════════════════════════════════════════════════════════
+COMPATIBILITY SCORE: 92/100 (EXCELLENT)
+═══════════════════════════════════════════════════════════
+
+✅ Recommendation: Desktop Edition
+
+Your hardware is well-suited for NTARI OS. All components
+are supported, with WiFi firmware being installed automatically.
+
+Expected installation time: 45 minutes
+Expected performance: Excellent
+
+[Download Desktop Edition] [View Full Report] [Exit]
+
+═══════════════════════════════════════════════════════════
+Note: WiFi will work after firmware installation (automatic)
+No manual configuration required.
+═══════════════════════════════════════════════════════════
+```
+
+---
+
+### 13.3 Hardware Detection During Installation
+
+#### 13.3.1 First-Boot Hardware Scan
+
+**Automatic Detection**:
+```bash
+# During first boot, run comprehensive hardware scan
+ntari-hw-detect --verbose
+
+# Output to:
+/var/log/ntari/hardware-detection.log
+/etc/ntari/hardware-profile.json
+```
+
+**Hardware Profile** (`/etc/ntari/hardware-profile.json`):
+```json
+{
+  "schema_version": "1.0.0",
+  "detected_at": "2026-02-16T14:30:00Z",
+  "system": {
+    "manufacturer": "Lenovo",
+    "product_name": "ThinkCentre M720q",
+    "serial": "REDACTED",
+    "bios_version": "M22KT49A",
+    "uefi": true
+  },
+  "cpu": {
+    "model": "Intel Core i5-8500T",
+    "cores": 6,
+    "threads": 6,
+    "arch": "x86_64",
+    "flags": ["avx2", "aes-ni", "sse4.2"],
+    "max_freq_mhz": 3500
+  },
+  "memory": {
+    "total_gb": 8,
+    "type": "DDR4",
+    "speed_mhz": 2666,
+    "dimms": [
+      {"size_gb": 8, "slot": "DIMM0"}
+    ]
+  },
+  "storage": [
+    {
+      "device": "/dev/nvme0n1",
+      "model": "Samsung SSD 970 EVO 250GB",
+      "size_gb": 250,
+      "type": "nvme",
+      "rotational": false
+    }
+  ],
+  "network": [
+    {
+      "interface": "eth0",
+      "type": "ethernet",
+      "driver": "e1000e",
+      "chipset": "Intel I219-LM",
+      "speed": "1000baseT/Full"
+    },
+    {
+      "interface": "wlan0",
+      "type": "wifi",
+      "driver": "iwlwifi",
+      "chipset": "Intel Wireless-AC 9560",
+      "firmware_required": true,
+      "firmware_package": "linux-firmware-iwlwifi"
+    }
+  ],
+  "gpu": [
+    {
+      "device": "00:02.0",
+      "vendor": "Intel",
+      "model": "UHD Graphics 630",
+      "driver": "i915",
+      "driver_loaded": true
+    }
+  ],
+  "audio": {
+    "chipset": "Realtek ALC233",
+    "driver": "snd_hda_intel"
+  },
+  "usb": {
+    "controllers": [
+      {"type": "USB 3.1", "ports": 4},
+      {"type": "USB 2.0", "ports": 2}
+    ]
+  }
+}
+```
+
+---
+
+#### 13.3.2 Automatic Driver Installation
+
+**Installer Logic**:
+```python
+def install_required_firmware():
+    """Install firmware packages based on detected hardware"""
+
+    hw_profile = load_hardware_profile()
+    packages_to_install = []
+
+    # WiFi firmware
+    for interface in hw_profile['network']:
+        if interface['type'] == 'wifi':
+            if interface.get('firmware_required'):
+                pkg = interface['firmware_package']
+                packages_to_install.append(pkg)
+                log(f"WiFi {interface['chipset']} requires {pkg}")
+
+    # GPU drivers
+    for gpu in hw_profile['gpu']:
+        if gpu['vendor'] == 'NVIDIA':
+            if user_wants_proprietary_nvidia():
+                packages_to_install.append('nvidia-driver')
+            # nouveau is already included
+
+    # Install all required packages
+    if packages_to_install:
+        log(f"Installing {len(packages_to_install)} firmware packages...")
+        apk_install(packages_to_install)
+
+    return packages_to_install
+```
+
+---
+
+### 13.4 Known Hardware Issues & Workarounds
+
+#### 13.4.1 Common Issues
+
+**Issue**: Black screen after boot (NVIDIA GPU)
+**Cause**: Nouveau driver conflict
+**Workaround**: Boot with `nomodeset` kernel parameter
+```bash
+# Add to boot parameters:
+nomodeset
+
+# Or after installation:
+sudo nano /etc/default/grub
+# Add nomodeset to GRUB_CMDLINE_LINUX_DEFAULT
+sudo update-grub
+```
+
+---
+
+**Issue**: WiFi not working (Broadcom)
+**Cause**: Missing proprietary driver
+**Workaround**: Install broadcom-wl driver
+```bash
+# Install from Alpine repository
+sudo apk add broadcom-wl
+
+# Load module
+sudo modprobe wl
+
+# Restart network
+sudo rc-service networking restart
+```
+
+---
+
+**Issue**: Laptop function keys not working
+**Cause**: Missing laptop-mode-tools
+**Workaround**: Install laptop utilities
+```bash
+sudo apk add laptop-mode-tools
+sudo rc-update add laptop_mode default
+```
+
+---
+
+**Issue**: External monitor not detected
+**Cause**: Needs manual xrandr configuration
+**Workaround**: Use xrandr or display settings
+```bash
+# List outputs
+xrandr
+
+# Enable external monitor
+xrandr --output HDMI-1 --auto --right-of eDP-1
+```
+
+---
+
+#### 13.4.2 Hardware Compatibility Report
+
+**User-Generated Reports**:
+Users can submit hardware compatibility reports to help expand the HCL.
+
+**Submission Tool**:
+```bash
+# Generate hardware report
+ntari report-hardware --submit
+
+# Generates report and prompts for upload
+```
+
+**Report Contents**:
+- Full hardware profile (JSON)
+- Installation success/failure
+- Any issues encountered
+- Driver/firmware needed
+- Contact info (optional)
+
+**Submission**: Uploads to https://compatibility.ntari.org
+
+**Privacy**: User can review report before submission, opt out of any fields
+
+---
+
+## 14. Installation Support & Troubleshooting
+
+### 14.1 CompTIA Troubleshooting Methodology
+
+Following CompTIA A+ best practices, NTARI OS troubleshooting follows the 6-step methodology:
+
+1. **Identify the problem**
+2. **Establish a theory of probable cause**
+3. **Test the theory to determine cause**
+4. **Establish a plan of action and implement**
+5. **Verify full system functionality**
+6. **Document findings**
+
+---
+
+### 14.2 Installation Failure Scenarios
+
+#### 14.2.1 Boot-Related Failures
+
+**SYMPTOM 1**: "No bootable device found"
+
+**Probable Causes**:
+1. USB not set as first boot device
+2. Secure Boot blocking unsigned bootloader
+3. USB not properly created
+4. BIOS in wrong boot mode (UEFI vs Legacy)
+
+**Diagnostic Steps**:
+```
+Step 1: Verify USB is bootable
+├── Try USB on another computer
+├── Recreate USB with NTARI Installer Tool
+└── Verify USB integrity (checksum)
+
+Step 2: Check BIOS settings
+├── Enter BIOS (F2, F12, Del depending on brand)
+├── Navigate to Boot menu
+├── Verify boot order (USB should be first)
+└── Save and exit
+
+Step 3: Check Secure Boot
+├── Enter BIOS
+├── Navigate to Security or Boot settings
+├── Disable Secure Boot
+├── Save and exit, retry
+
+Step 4: Try different boot mode
+├── If in UEFI mode, try Legacy
+├── If in Legacy, try UEFI
+└── Match USB creation mode to BIOS mode
+```
+
+**Solutions by Priority**:
+1. ✅ **Change boot order** in BIOS → 60% success rate
+2. ✅ **Disable Secure Boot** → 25% success rate
+3. ✅ **Recreate USB drive** → 10% success rate
+4. ✅ **Switch UEFI/Legacy mode** → 5% success rate
+
+---
+
+**SYMPTOM 2**: Black screen after selecting "Install NTARI OS"
+
+**Probable Causes**:
+1. GPU driver incompatibility
+2. Display resolution issue
+3. Kernel parameter needed
+
+**Diagnostic Steps**:
+```
+Step 1: Boot with nomodeset parameter
+├── At GRUB menu, press 'e' to edit
+├── Find line starting with 'linux'
+├── Add 'nomodeset' at the end
+├── Press Ctrl+X or F10 to boot
+
+If successful → GPU driver issue confirmed
+
+Step 2: Try different video mode
+├── Edit boot parameters again
+├── Add: nomodeset vga=791
+└── Boot
+
+Step 3: Check for specific GPU
+├── If NVIDIA: Known issue, nomodeset required
+├── If AMD (old): Try radeon.modeset=0
+└── If Intel: Usually works, check cable/monitor
+```
+
+**Solutions**:
+1. ✅ **Add nomodeset** → 70% success rate
+2. ✅ **Different video mode (vga=)** → 15% success rate
+3. ✅ **Try different display cable/monitor** → 10% success rate
+4. ✅ **Update BIOS** → 5% success rate
+
+**Permanent Fix** (After Installation):
+```bash
+# Edit GRUB config
+sudo nano /etc/default/grub
+
+# Add nomodeset to:
+GRUB_CMDLINE_LINUX_DEFAULT="quiet nomodeset"
+
+# Update GRUB
+sudo update-grub
+```
+
+---
+
+**SYMPTOM 3**: Kernel panic during boot
+
+**Screen Shows**:
+```
+Kernel panic - not syncing: VFS: Unable to mount root fs
+```
+
+**Probable Causes**:
+1. Corrupted installation media
+2. Hardware incompatibility
+3. Bad RAM
+4. Disk controller issue
+
+**Diagnostic Steps**:
+```
+Step 1: Verify installation media
+├── Recreate USB from fresh ISO download
+├── Verify ISO checksum: sha256sum ntari-desktop-1.0.iso
+└── Try different USB port (USB 2.0 vs 3.0)
+
+Step 2: Test RAM
+├── Boot memtest86+ (from USB installer troubleshooting menu)
+├── Run for at least 1 full pass
+└── If errors found → bad RAM, replace
+
+Step 3: Try compatibility mode
+├── Boot with: acpi=off noapic nolapic
+└── If works → ACPI/APIC issue (rare on modern hardware)
+
+Step 4: Check disk
+├── Boot from USB (live mode)
+├── Run: sudo smartctl -a /dev/sda
+└── Check for disk errors
+```
+
+**Solutions**:
+1. ✅ **Recreate installation media** → 40% success rate
+2. ✅ **Bad RAM replacement** → 30% success rate
+3. ✅ **ACPI/APIC parameters** → 20% success rate
+4. ✅ **Different disk/SATA port** → 10% success rate
+
+---
+
+#### 14.2.2 Network-Related Failures
+
+**SYMPTOM 4**: WiFi adapter not detected
+
+**Diagnostic Steps**:
+```
+Step 1: Check if WiFi hardware exists
+├── Run: lspci | grep -i network
+├── Or: lsusb (for USB WiFi adapters)
+└── Note the chipset (e.g., "Realtek RTL8822CE")
+
+Step 2: Check driver status
+├── Run: lsmod | grep wifi
+├── Run: dmesg | grep firmware
+└── Look for firmware errors
+
+Step 3: Install firmware if missing
+├── Identify chipset from Step 1
+├── If Realtek 8822CE: sudo apk add rtl8822ce-dkms
+├── If Intel: sudo apk add linux-firmware-iwlwifi
+├── If Broadcom: sudo apk add broadcom-wl
+└── Reboot
+
+Step 4: Verify after reboot
+├── Run: ip link show
+├── Should see wlan0 or similar
+└── Run: nmcli device status
+```
+
+**Common WiFi Chipsets & Packages**:
+| Chipset | Package Required | Auto-Install? |
+|---------|------------------|---------------|
+| Intel 9560, 9260, etc. | linux-firmware-iwlwifi | Yes |
+| Realtek RTL8822CE | rtl8822ce-dkms | Yes |
+| Realtek RTL8821CE | rtl8821ce-dkms | Yes |
+| Qualcomm QCA9377 | ath10k-firmware | Yes |
+| Broadcom BCM4360 | broadcom-wl | No (prompt) |
+
+---
+
+**SYMPTOM 5**: Can't connect to WiFi network
+
+**Diagnostic Steps**:
+```
+Step 1: Verify adapter is working
+├── Run: nmcli device status
+├── WiFi should show "disconnected" (not "unavailable")
+
+Step 2: Scan for networks
+├── Run: nmcli device wifi list
+├── Verify your network appears
+└── Note signal strength
+
+Step 3: Attempt connection
+├── Run: nmcli device wifi connect "SSID" password "PASSWORD"
+├── Observe any error messages
+
+Step 4: Check authentication
+├── WPA2-PSK: Should work out-of-box
+├── WPA3: May need updated wpa_supplicant
+├── Enterprise (802.1X): Use network manager GUI
+└── Open network: Should work without password
+```
+
+**Common WiFi Connection Issues**:
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Secrets were required but not provided" | Wrong password | Re-enter correct password |
+| "Connection timeout" | Weak signal | Move closer to router |
+| "Authentication failed" | WPA3 incompatibility | Set router to WPA2 |
+| "No Internet access" | DNS issue | Check DHCP, try manual DNS |
+
+---
+
+#### 14.2.3 Storage-Related Failures
+
+**SYMPTOM 6**: "Insufficient disk space" during installation
+
+**Diagnostic Steps**:
+```
+Step 1: Check actual disk size
+├── Run: lsblk
+├── Verify disk capacity
+└── Look for existing partitions
+
+Step 2: Calculate space needed
+├── Desktop Edition: 20GB minimum, 50GB recommended
+├── Lite Edition: 8GB minimum, 16GB recommended
+├── Server Edition: 4GB minimum, 8GB recommended
+└── Add 4GB for swap (optional)
+
+Step 3: Free up space if dual-boot
+├── Boot into existing OS (Windows/Linux)
+├── Use Disk Management / GParted
+├── Shrink existing partition by 50GB+
+└── Leave space unallocated
+
+Step 4: Use different drive
+├── If multiple drives available
+├── Select larger drive during installation
+└── Or use external USB drive (slow, not recommended)
+```
+
+---
+
+**SYMPTOM 7**: Disk not detected during installation
+
+**Diagnostic Steps**:
+```
+Step 1: Check BIOS disk mode
+├── Enter BIOS
+├── Look for SATA mode: AHCI vs RAID vs IDE
+├── Set to AHCI (for SSDs/SATA drives)
+└── Save and reboot
+
+Step 2: Verify disk is connected
+├── In BIOS, check if disk appears
+├── Note disk model/size
+└── If not appearing in BIOS → hardware issue
+
+Step 3: Try different installer options
+├── Boot from USB
+├── At menu, choose "Expert mode"
+├── Manual disk selection
+└── Use /dev/nvme0n1 or /dev/sda explicitly
+
+Step 4: Check if NVMe driver loaded
+├── For NVMe SSDs
+├── Run: lsmod | grep nvme
+├── Should see nvme module loaded
+└── If not: older kernel, try updating ISO
+```
+
+---
+
+### 14.3 Error Code Reference Guide
+
+#### 14.3.1 Installation Error Codes
+
+| Code | Error Message | Cause | Solution | Frequency |
+|------|---------------|-------|----------|-----------|
+| **E001** | No bootable device found | BIOS boot order | Change boot priority to USB | Very Common |
+| **E002** | Secure Boot validation failed | Secure Boot enabled | Disable Secure Boot in BIOS | Common |
+| **E003** | Kernel panic on boot | GPU driver issue | Boot with `nomodeset` | Common |
+| **E004** | WiFi adapter not found | Missing firmware | Auto-installed next step | Common |
+| **E005** | Insufficient disk space | Disk too small | Use 20GB+ drive | Occasional |
+| **E006** | Partition table corrupt | Previous OS issue | Recreate partition table | Rare |
+| **E007** | GRUB installation failed | UEFI/Legacy mismatch | Reinstall in correct mode | Occasional |
+| **E008** | Out of memory | Insufficient RAM | Use Lite Edition or add RAM | Rare |
+| **E009** | Network timeout | No internet during install | Skip network step, configure later | Occasional |
+| **E010** | Disk write error | Bad sectors on disk | Use different drive | Rare |
+| **E011** | Bootloader conflict | Dual-boot issue | Boot repair tool | Occasional |
+| **E012** | File system error | Corrupted partition | Reformat partition | Rare |
+| **E013** | Driver loading failed | Hardware incompatibility | Check HCL, use compatibility mode | Rare |
+| **E014** | Time sync failure | No RTC battery | Ignore or replace CMOS battery | Very Rare |
+| **E015** | Package verification failed | Corrupted ISO | Re-download ISO, verify checksum | Rare |
+
+---
+
+#### 14.3.2 Post-Install Error Codes
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| **P001** | Network daemon failed to start | Config error | Run: sudo ntari-network-repair |
+| **P002** | Storage daemon initialization failed | Permission issue | Run: sudo ntari-fix-permissions |
+| **P003** | Desktop environment won't start | GPU driver issue | Check logs: /var/log/Xorg.0.log |
+| **P004** | No sound output | Audio driver | Run: sudo ntari-audio-detect |
+| **P005** | Bluetooth not working | Firmware missing | Install: sudo apk add bluetooth-firmware |
+| **P006** | Screen resolution wrong | Display config | Run: xrandr or use display settings |
+| **P007** | Keyboard layout incorrect | Locale setting | Run: sudo setup-keymap |
+| **P008** | Timezone wrong | Config issue | Run: sudo setup-timezone |
+| **P009** | Updates failing | Repository issue | Run: sudo apk update --allow-untrusted |
+| **P010** | Can't join P2P network | Firewall blocking | Check: sudo ntari network diagnose |
+
+---
+
+### 14.4 Diagnostic Tools
+
+#### 14.4.1 Boot Diagnostic Mode
+
+**Access**: Add `ntari-diagnostic` to kernel boot parameters
+
+**Features**:
+```
+NTARI OS Diagnostic Mode
+─────────────────────────────────────────────────────────
+
+Booting in safe mode with minimal drivers...
+
+1. Hardware Detection Test
+2. Network Connectivity Test
+3. Storage Health Check
+4. Driver Verification
+5. Log Collection
+6. Boot Repair
+7. Return to Normal Boot
+
+Select option [1-7]:
+```
+
+**Option 1: Hardware Detection Test**:
+```
+Scanning hardware...
+
+✓ CPU: Intel Core i5-8500T detected
+✓ RAM: 8GB DDR4 detected
+✓ Storage: 256GB NVMe SSD detected
+✓ Network: Intel I219-LM Ethernet detected
+⚠ WiFi: Realtek RTL8822CE (needs firmware)
+✓ GPU: Intel UHD 630 detected
+✓ Audio: Realtek ALC233 detected
+
+Missing firmware packages:
+- rtl8822ce-dkms
+
+Would you like to install these now? [Y/n]
+```
+
+---
+
+#### 14.4.2 Network Diagnostic Tool
+
+**Command**: `ntari network diagnose`
+
+**Output**:
+```
+NTARI Network Diagnostic Tool v1.0
+═══════════════════════════════════════════════════════════
+
+Running comprehensive network diagnostics...
+
+[1/8] Checking Network Interfaces...
+  ✓ eth0: UP, 1000 Mbps, IP: 192.168.1.100
+  ⚠ wlan0: DOWN (firmware not loaded)
+
+[2/8] Testing Internet Connectivity...
+  ✓ Ping 8.8.8.8: Success (12 ms)
+  ✓ DNS resolution: Success
+  ✓ HTTPS connectivity: Success
+
+[3/8] Checking NTARI Network Services...
+  ✓ ntari-network daemon: Running
+  ⚠ ntari-p2p daemon: Stopped (waiting for WiFi)
+  ✓ ntari-storage daemon: Running
+
+[4/8] Testing P2P Connectivity...
+  ⚠ No peers discovered (WiFi offline)
+
+[5/8] Checking Firewall Rules...
+  ✓ NTARI ports open: 8080, 8443, 9000-9010
+  ⚠ UPnP not enabled on router (may affect NAT traversal)
+
+[6/8] Testing NAT Traversal...
+  ⚠ Skipped (no P2P connection)
+
+[7/8] Checking DNS Configuration...
+  ✓ /etc/resolv.conf: Valid
+  ✓ DNS servers: 8.8.8.8, 1.1.1.1
+
+[8/8] Speed Test...
+  ↓ Download: 98.5 Mbps
+  ↑ Upload: 23.2 Mbps
+  Latency: 12 ms
+
+═══════════════════════════════════════════════════════════
+SUMMARY
+═══════════════════════════════════════════════════════════
+
+Issues Found: 2
+
+1. WiFi adapter offline (missing firmware)
+   Solution: sudo apk add rtl8822ce-dkms && reboot
+
+2. UPnP not enabled on router
+   Solution: Enable UPnP in router settings
+   Impact: May affect P2P connection quality
+
+[View Full Report] [Save Log] [Exit]
+```
+
+---
+
+#### 14.4.3 Log Collection Tool
+
+**Command**: `ntari collect-logs`
+
+**Purpose**: Package all relevant logs for support/debugging
+
+**Output**:
+```
+Collecting NTARI diagnostic logs...
+
+[1/6] System logs...
+  ✓ /var/log/messages
+  ✓ /var/log/syslog
+  ✓ dmesg output
+
+[2/6] NTARI service logs...
+  ✓ /var/log/ntari/network.log
+  ✓ /var/log/ntari/storage.log
+  ✓ /var/log/ntari/p2p.log
+
+[3/6] Hardware information...
+  ✓ lspci output
+  ✓ lsusb output
+  ✓ /etc/ntari/hardware-profile.json
+
+[4/6] Network configuration...
+  ✓ ip addr output
+  ✓ /etc/network/interfaces
+  ✓ nmcli output
+
+[5/6] X11/GPU logs...
+  ✓ /var/log/Xorg.0.log
+
+[6/6] Package information...
+  ✓ apk list --installed
+
+Creating archive...
+✓ Logs saved to: /tmp/ntari-logs-2026-02-16-143045.tar.gz
+
+You can upload this file to:
+https://support.ntari.org/logs
+
+Or share with support team on Discord.
+
+[Upload Now] [Save to USB] [Exit]
+```
+
+---
+
+### 14.5 Boot Repair Tool
+
+**Access**: From USB installer's troubleshooting menu
+
+**Purpose**: Fix common boot issues after installation
+
+---
+
+#### 14.5.1 Boot Repair Options
+
+```
+═══════════════════════════════════════════════════════════
+NTARI Boot Repair Tool v1.0
+═══════════════════════════════════════════════════════════
+
+Select repair option:
+
+1. Reinstall GRUB bootloader
+   └ Fixes: "GRUB rescue" errors, missing boot menu
+
+2. Repair dual-boot configuration
+   └ Fixes: Windows/NTARI not appearing in boot menu
+
+3. Reset boot partition
+   └ Fixes: Corrupted boot files
+
+4. Rebuild initramfs
+   └ Fixes: Kernel panic, driver loading issues
+
+5. Restore bootloader backup
+   └ Restores previous working configuration
+
+6. Advanced options
+   └ Manual repair, chroot environment
+
+7. Exit to main menu
+
+Select [1-7]:
+```
+
+---
+
+#### 14.5.2 Reinstall GRUB Process
+
+**Option 1**: Reinstall GRUB bootloader
+
+**Process**:
+```
+Reinstalling GRUB bootloader...
+
+[1/5] Detecting installed NTARI OS...
+  ✓ Found installation on /dev/sda3
+
+[2/5] Mounting partitions...
+  ✓ Mounted / on /dev/sda3
+  ✓ Mounted /boot/efi on /dev/sda1
+
+[3/5] Detecting boot mode...
+  ✓ UEFI mode detected
+
+[4/5] Reinstalling GRUB...
+  ✓ grub-install --target=x86_64-efi --efi-directory=/boot/efi
+
+[5/5] Updating configuration...
+  ✓ update-grub
+  ✓ Found NTARI OS
+  ✓ Found Windows 11 on /dev/sda2
+
+═══════════════════════════════════════════════════════════
+GRUB reinstalled successfully!
+
+Boot menu now includes:
+• NTARI OS
+• NTARI OS (recovery mode)
+• Windows 11
+
+Remove USB drive and reboot.
+
+[Reboot Now] [Return to Menu]
+```
+
+---
+
+### 14.6 Troubleshooting Flowcharts
+
+#### 14.6.1 Boot Failure Flowchart
+
+```
+START: Computer won't boot NTARI OS
+│
+├─ Does BIOS/boot menu appear?
+│  ├─ NO → Check monitor cable, power supply
+│  └─ YES → Continue
+│
+├─ Does USB/boot menu show?
+│  ├─ NO → Enter BIOS, change boot order
+│  └─ YES → Continue
+│
+├─ Does GRUB menu appear?
+│  ├─ NO → Boot from USB, run boot repair tool
+│  └─ YES → Continue
+│
+├─ Select "NTARI OS" from menu
+│  │
+│  ├─ Black screen?
+│  │  └─ Edit boot, add "nomodeset"
+│  │
+│  ├─ Kernel panic?
+│  │  └─ Check RAM (memtest86+), verify installation media
+│  │
+│  ├─ Login prompt appears?
+│  │  └─ SUCCESS! Log in and check for errors
+│  │
+│  └─ Other error?
+│     └─ Note error code, search docs or ask support
+
+```
+
+---
+
+#### 14.6.2 WiFi Not Working Flowchart
+
+```
+START: WiFi not working
+│
+├─ Is WiFi adapter detected?
+│  │ Run: lspci | grep -i network
+│  │
+│  ├─ NO → Hardware issue or disabled in BIOS
+│  │  └─ Check BIOS wireless settings
+│  │
+│  └─ YES → Note chipset, continue
+│
+├─ Is driver loaded?
+│  │ Run: lsmod | grep wifi
+│  │
+│  ├─ NO → Install firmware based on chipset
+│  │  ├─ Intel: apk add linux-firmware-iwlwifi
+│  │  ├─ Realtek 8822CE: apk add rtl8822ce-dkms
+│  │  └─ Broadcom: apk add broadcom-wl
+│  │
+│  └─ YES → Continue
+│
+├─ Does "nmcli device status" show WiFi?
+│  │
+│  ├─ NO → Restart network: rc-service networking restart
+│  │
+│  └─ YES → Continue
+│
+├─ Can you scan for networks?
+│  │ Run: nmcli device wifi list
+│  │
+│  ├─ NO → Check if WiFi is blocked: rfkill list
+│  │  └─ If blocked: rfkill unblock wifi
+│  │
+│  └─ YES → Continue
+│
+├─ Connect to network:
+│  │ nmcli device wifi connect "SSID" password "PASSWORD"
+│  │
+│  ├─ "Authentication failed" → Wrong password or WPA3 incompatibility
+│  ├─ "Connection timeout" → Weak signal, move closer
+│  └─ "Success" → WiFi working!
+
+```
+
+---
+
+### 14.7 Recovery & Rescue
+
+#### 14.7.1 Live USB Recovery Mode
+
+**Purpose**: Fix broken installation without reinstalling
+
+**Access**: Boot from USB, select "Rescue installed system"
+
+**Features**:
+```
+NTARI Rescue Mode
+─────────────────────────────────────────────────────────
+
+Scanning for installed NTARI OS...
+✓ Found installation on /dev/sda3
+
+Mounting installation...
+✓ Mounted filesystem
+
+You can now:
+1. Access installed system files
+2. Edit configuration
+3. Reinstall packages
+4. Run repair tools
+
+Mounted at: /mnt/ntari
+
+[Open Terminal] [File Manager] [Return to Menu]
+```
+
+**Terminal Access**:
+```bash
+# Chroot into installed system
+sudo chroot /mnt/ntari
+
+# Now you're "inside" the installed system
+# Can run commands as if booted normally:
+apk update
+apk fix
+update-grub
+etc.
+```
+
+---
+
+#### 14.7.2 File Rescue
+
+**Purpose**: Recover files from broken installation
+
+**Process**:
+```
+File Rescue Mode
+─────────────────────────────────────────────────────────
+
+Your files are located at:
+/mnt/ntari/home/<username>/
+
+You can:
+1. Copy files to USB drive
+2. Upload to cloud storage
+3. Copy to external hard drive
+
+[Browse Files] [Copy to USB] [Exit]
+```
+
+---
+
+## 15. BIOS/UEFI Configuration Guide
+
+### 15.1 Accessing BIOS/UEFI
+
+**Purpose**: Help users access BIOS settings, the most common installation failure point.
+
+#### 15.1.1 Brand-Specific Boot Keys
+
+| Manufacturer | Boot Menu Key | BIOS Setup Key | Notes |
+|--------------|---------------|----------------|-------|
+| **Dell** | F12 | F2 | Press immediately when Dell logo appears |
+| **HP** | F9 or Esc, then F9 | F10 or Esc, then F10 | Esc brings up startup menu first |
+| **Lenovo** | F12 | F1 or F2 | ThinkPad: F12 & F1, IdeaPad: F2 |
+| **ASUS** | F8 or Esc | F2 or Del | Esc for boot menu, F2 for BIOS |
+| **Acer** | F12 | F2 or Del | May need to enable F12 in BIOS first |
+| **MSI** | F11 | Del | Gaming laptops: F11, desktops: Del |
+| **Gigabyte** | F12 | Del | Motherboards |
+| **ASRock** | F11 | F2 or Del | Motherboards |
+| **Apple (Intel Mac)** | Option (⌥) | Hold Option during boot | For Boot Camp dual-boot |
+| **Samsung** | F2 or F10 | F2 | Older models |
+| **Toshiba** | F12 | F2 | Older models |
+
+**Timing**: Press key repeatedly immediately when computer starts, before OS logo
+
+---
+
+#### 15.1.2 Visual Guide Requirements
+
+**Photo Guide Structure**:
+```
+docs/BIOS_GUIDE.pdf
+├── Section 1: Common Boot Keys (quick reference)
+├── Section 2: Dell Computers (15 pages)
+│   ├── OptiPlex series
+│   ├── Inspiron series
+│   └── XPS series
+├── Section 3: HP Computers (15 pages)
+│   ├── EliteDesk series
+│   ├── ProBook series
+│   └── Pavilion series
+├── Section 4: Lenovo Computers (15 pages)
+│   ├── ThinkPad series
+│   ├── ThinkCentre series
+│   └── IdeaPad series
+├── Section 5: Other Brands (10 pages)
+└── Section 6: Troubleshooting (5 pages)
+```
+
+**Photos Per Computer** (10-15 shots):
+1. Manufacturer logo screen with boot key overlay
+2. Boot menu screen (highlighting USB option)
+3. BIOS entry screen
+4. Main BIOS menu
+5. Boot tab/menu
+6. Boot priority settings
+7. Secure Boot location
+8. Legacy/UEFI mode toggle
+9. Save & exit confirmation
+10. First boot after changes
+
+---
+
+### 15.2 Disable Secure Boot
+
+**Why Needed**: Secure Boot requires signed bootloaders. NTARI OS bootloader may not be signed initially.
+
+**NOTE**: Secure Boot support is planned for v1.1 with signed bootloader.
+
+---
+
+#### 15.2.1 Dell Computers
+
+**Steps** (Dell OptiPlex/Inspiron):
+```
+1. Restart computer
+2. Press F2 repeatedly when Dell logo appears
+3. BIOS Setup opens
+4. Navigate to "Secure Boot" (use arrow keys)
+5. Select "Secure Boot Enable"
+6. Change to "Disabled"
+7. Press F10 to save
+8. Confirm: "Save and Exit"
+9. Computer will restart
+```
+
+**Screenshot** (Example):
+```
+┌────────────────────────────────────────────────────────┐
+│ Dell BIOS Setup                                   F10=Save│
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│ Secure Boot                                            │
+│ ┌────────────────────────────────────────────────┐    │
+│ │ Secure Boot Enable         [ Disabled     ▼ ] │    │
+│ │                                                │    │
+│ │ Options:                                       │    │
+│ │   • Enabled                                    │    │
+│ │   • Disabled    ◄── Select this               │    │
+│ │                                                │    │
+│ └────────────────────────────────────────────────┘    │
+│                                                        │
+│ NOTE: Disabling Secure Boot may prevent some          │
+│ operating systems from booting.                        │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 15.2.2 HP Computers
+
+**Steps** (HP EliteDesk/ProBook):
+```
+1. Restart computer
+2. Press Esc when HP logo appears
+3. Press F10 for "BIOS Setup"
+4. Navigate to "Security" tab
+5. Select "Secure Boot Configuration"
+6. Change "Secure Boot" to "Disabled"
+7. If prompted, clear keys: "Clear All Secure Boot Keys"
+8. Press F10 to save
+9. Confirm "Exit Saving Changes"
+```
+
+**Note**: Some HP systems require clearing Secure Boot keys AND disabling.
+
+---
+
+#### 15.2.3 Lenovo Computers
+
+**Steps** (ThinkPad/ThinkCentre):
+```
+1. Restart computer
+2. Press F1 when Lenovo logo appears (or F2 for IdeaPad)
+3. BIOS Setup opens
+4. Navigate to "Security" tab
+5. Select "Secure Boot"
+6. Change to "Disabled"
+7. Press F10 to save
+8. Confirm "Yes" to save and exit
+```
+
+**ThinkPad Specific**:
+- Some ThinkPads have BIOS password protection
+- If password set, you'll need it to change Secure Boot
+
+---
+
+#### 15.2.4 ASUS Computers
+
+**Steps** (ASUS VivoBook/ROG):
+```
+1. Restart computer
+2. Press F2 or Del repeatedly
+3. UEFI BIOS Utility opens
+4. Press F7 for "Advanced Mode" (if in EZ Mode)
+5. Navigate to "Boot" tab
+6. Find "Secure Boot" section
+7. Change "OS Type" to "Other OS" (this disables Secure Boot)
+8. Press F10 to save
+9. Confirm "Save and Exit"
+```
+
+---
+
+### 15.3 Change Boot Priority
+
+**Purpose**: Make USB drive boot before hard drive
+
+#### 15.3.1 Boot Priority Example (Dell)
+
+**Steps**:
+```
+1. In BIOS Setup
+2. Navigate to "Boot Sequence" or "Boot" tab
+3. Current order might be:
+   1. Windows Boot Manager
+   2. Hard Drive
+   3. USB Storage Device
+4. Change to:
+   1. USB Storage Device  ◄── Move to top
+   2. Windows Boot Manager
+   3. Hard Drive
+5. Use +/- or F5/F6 to reorder
+6. Save with F10
+```
+
+**Visual**:
+```
+Boot Sequence
+──────────────────────────────────────────────────
+ ▲  USB Storage Device (Kingston DataTraveler 3.0)
+ │  Windows Boot Manager
+ │  Internal HDD (Samsung SSD 970 EVO)
+ ▼  Network Boot
+
+Use ↑↓ to select, +/- or F5/F6 to move
+F10=Save and Exit
+```
+
+---
+
+### 15.4 UEFI vs Legacy Boot Mode
+
+**Understanding**: Modern computers use UEFI, older computers use Legacy BIOS
+
+#### 15.4.1 When to Use Each Mode
+
+**UEFI Mode** (Recommended):
+- ✅ Faster boot times
+- ✅ Supports disks >2TB
+- ✅ Secure Boot capability
+- ✅ Modern feature support
+- Use when: Computer from 2012+
+
+**Legacy Mode** (Compatibility):
+- For older computers (pre-2012)
+- For dual-boot with old Windows versions
+- When UEFI boot fails
+- Use when: UEFI mode doesn't work
+
+#### 15.4.2 Switching Boot Mode
+
+**Dell**:
+```
+BIOS Setup → General → Boot Sequence
+  Boot List Option: [ UEFI ▼ ]
+     Options:
+       • UEFI         ◄── Modern systems
+       • Legacy       ◄── Older systems
+```
+
+**HP**:
+```
+BIOS Setup → System Configuration → Boot Options
+  Boot Mode: [ UEFI Native ▼ ]
+     Options:
+       • UEFI Native (no CSM)  ◄── Pure UEFI
+       • Legacy Support         ◄── BIOS mode
+```
+
+**CRITICAL**: USB installer must match BIOS mode
+- UEFI BIOS → Use UEFI USB
+- Legacy BIOS → Use Legacy USB
+- NTARI Installer creates hybrid USB (works in both modes)
+
+---
+
+### 15.5 Common BIOS Settings for NTARI Installation
+
+#### 15.5.1 Recommended Settings Checklist
+
+```
+BIOS Configuration Checklist for NTARI OS
+────────────────────────────────────────────────────
+
+Boot Settings:
+[ ] Boot Mode: UEFI (or Legacy if older computer)
+[ ] Secure Boot: Disabled
+[ ] Fast Boot: Disabled (optional, helps with boot menu)
+[ ] Boot Priority: USB first, then hard drive
+
+Security:
+[ ] Secure Boot: Disabled
+[ ] Supervisor/Admin Password: Optional (set if you want)
+
+Storage:
+[ ] SATA Mode: AHCI (NOT RAID or IDE)
+[ ] M.2 PCIe Mode: Enabled (for NVMe SSDs)
+
+Power:
+[ ] Wake on LAN: Disabled (optional)
+[ ] USB PowerShare: Enabled (for USB keyboard in BIOS)
+
+Virtualization (optional, for future features):
+[ ] Intel VT-x / AMD-V: Enabled
+[ ] Intel VT-d / AMD-Vi: Enabled
+
+Legacy Features:
+[ ] CSM (Compatibility Support Module): Auto or Enabled
+[ ] Legacy USB Support: Enabled
+
+────────────────────────────────────────────────────
+After making changes:
+1. Press F10 to save
+2. Confirm "Save and Exit"
+3. Computer will restart automatically
+```
+
+---
+
+### 15.6 SATA Mode Configuration
+
+**Critical for Storage Detection**
+
+#### 15.6.1 AHCI vs RAID vs IDE
+
+**AHCI Mode** (Recommended):
+- ✅ Advanced Host Controller Interface
+- ✅ Best for SSDs and modern HDDs
+- ✅ Supports hot-swapping
+- ✅ Better performance
+- Use this for NTARI OS
+
+**RAID Mode**:
+- For multiple disk arrays
+- Requires RAID configuration
+- NOT needed for single disk
+- Can prevent disk detection
+
+**IDE Mode** (Legacy):
+- Old compatibility mode
+- Slower performance
+- Only for very old hardware
+
+#### 15.6.2 Changing SATA Mode
+
+**Location** (varies by manufacturer):
+```
+Dell: System Configuration → SATA Operation
+HP: System Options → SATA Controller Mode
+Lenovo: Config → Serial ATA (SATA)
+ASUS: Advanced → SATA Configuration → SATA Mode
+```
+
+**Setting**:
+```
+SATA Mode Selection: [ AHCI ▼ ]
+   Options:
+     • AHCI        ◄── Select this
+     • RAID
+     • IDE
+```
+
+**Warning**: Changing from RAID to AHCI can break Windows if it was installed in RAID mode.
+
+---
+
+### 15.7 Troubleshooting BIOS Access
+
+#### 15.7.1 Can't Access BIOS
+
+**Problem**: Pressing F2/F12/Del does nothing
+
+**Solutions**:
+1. **Try different keys**:
+   - F1, F2, F10, F12, Del, Esc
+   - Try each one multiple times
+
+2. **Press earlier**:
+   - Start pressing BEFORE computer logo appears
+   - Press repeatedly (10+ times per second)
+
+3. **Disconnect peripherals**:
+   - Remove external USB devices
+   - Some devices interfere with boot keys
+
+4. **Check keyboard**:
+   - Try different USB port (USB 2.0 vs 3.0)
+   - Try different keyboard
+   - Wired keyboard usually more reliable
+
+5. **Disable Fast Startup** (Windows systems):
+   - Boot into Windows
+   - Control Panel → Power Options
+   - Choose what power buttons do
+   - Turn off fast startup
+   - Restart and try again
+
+6. **BIOS recovery** (last resort):
+   - Some manufacturers have BIOS recovery mode
+   - Dell: Press Ctrl+Esc on power-on
+   - HP: Windows recovery > Advanced > UEFI Firmware Settings
+
+---
+
+### 15.8 Post-BIOS Boot Process
+
+#### 15.8.1 Expected Boot Sequence
+
+**After BIOS Configuration**:
+```
+1. Computer powers on
+   └ Manufacturer logo appears
+
+2. BIOS/UEFI loads
+   └ Boot device selected (USB)
+
+3. GRUB bootloader loads
+   ┌──────────────────────────────────────┐
+   │ NTARI OS Installer                   │
+   │ ▶ Try NTARI OS (Live Mode)           │
+   │   Install NTARI OS                   │
+   │   Troubleshooting                    │
+   │   Boot from local drive              │
+   └──────────────────────────────────────┘
+
+4. Select "Try NTARI OS" or "Install NTARI OS"
+
+5. NTARI OS boots or installation begins
+```
+
+---
+
+## 16. Network Configuration Guide
+
+### 16.1 Network Setup Wizard
+
+**When**: During first boot, after installation completes
+
+**Purpose**: Configure basic networking before P2P features
+
+---
+
+#### 16.1.1 WiFi Configuration Screen
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Network Setup                                      [4 of 9] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Select network connection:                                 │
+│                                                             │
+│ ○ Wired (Ethernet)                                         │
+│   └ eth0: Connected, 192.168.1.100                         │
+│                                                             │
+│ ● Wireless (WiFi)                                          │
+│   └ wlan0: Available networks found                        │
+│                                                             │
+│ Available WiFi Networks:                                   │
+│ ┌───────────────────────────────────────────────────────┐  │
+│ │ ▶ HomeNetwork_5G          ▂▄▆█ WPA2  Select         │  │
+│ │   HomeNetwork_2.4G        ▂▄▆_ WPA2                  │  │
+│ │   Starbucks WiFi          ▂▄__ Open                   │  │
+│ │   NETGEAR-Guest           ▂___ WPA2                   │  │
+│ │                                                       │  │
+│ │ [Refresh] [Enter Network Name Manually]              │  │
+│ └───────────────────────────────────────────────────────┘  │
+│                                                             │
+│ [ ← Back ]                              [ Connect → ]       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**After selecting network**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Connect to WiFi                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Network: HomeNetwork_5G                                    │
+│ Security: WPA2-PSK                                          │
+│ Signal: ▂▄▆█ Excellent                                     │
+│                                                             │
+│ Password: [________________________________]                │
+│           [x] Show password                                │
+│                                                             │
+│ [ ] Connect automatically                                   │
+│                                                             │
+│ [Cancel] [Connect]                                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 16.1.2 Ethernet Configuration
+
+**Automatic (DHCP)** - Default:
+```
+Ethernet Connection (eth0)
+─────────────────────────────────────────────────────
+
+Status: Connected
+IP Address: 192.168.1.100 (automatic)
+Subnet Mask: 255.255.255.0
+Gateway: 192.168.1.1
+DNS: 8.8.8.8, 1.1.1.1
+
+Configuration: DHCP (automatic)
+
+[Configure Manually] [Test Connection] [Continue]
+```
+
+**Manual (Static IP)** - Advanced:
+```
+Manual Network Configuration
+─────────────────────────────────────────────────────
+
+IP Address: [192.168.1].[___]
+Subnet Mask: [255.255.255.0]
+Gateway: [192.168.1.1]
+DNS 1: [8.8.8.8]
+DNS 2: [1.1.1.1] (optional)
+
+[Automatic (DHCP)] [Save] [Cancel]
+```
+
+---
+
+### 16.2 Network Diagnostic Tools
+
+#### 16.2.1 Built-in Connectivity Test
+
+**Command**: `ntari network test`
+
+**Output**:
+```
+NTARI Network Connectivity Test
+═══════════════════════════════════════════════════════════
+
+[1/5] Testing local network...
+  ✓ Network interface active (eth0)
+  ✓ IP address assigned: 192.168.1.100
+  ✓ Default gateway reachable: 192.168.1.1
+
+[2/5] Testing DNS resolution...
+  ✓ DNS query successful (ntari.org → 104.21.83.37)
+  ✓ DNS response time: 23 ms
+
+[3/5] Testing internet connectivity...
+  ✓ Ping 8.8.8.8 successful (12 ms)
+  ✓ Ping cloudflare.com successful (15 ms)
+
+[4/5] Testing HTTPS connectivity...
+  ✓ HTTPS request to ntari.org successful
+
+[5/5] Testing NTARI network services...
+  ✓ NTARI network daemon running
+  ⚠ P2P daemon starting (0 peers discovered yet)
+
+═══════════════════════════════════════════════════════════
+RESULT: Internet connection working perfectly!
+
+You're ready to join the NTARI P2P network.
+
+[Continue to Next Step] [Run Full Diagnostics]
+```
+
+---
+
+#### 16.2.2 Speed Test Tool
+
+**Command**: `ntari network speed`
+
+**Output**:
+```
+NTARI Network Speed Test
+═══════════════════════════════════════════════════════════
+
+Finding nearest test server...
+✓ Server: Speedtest.net (Louisville, KY) - 12 km away
+
+Testing download speed...
+████████████████████████░░ 98.5 Mbps
+
+Testing upload speed...
+███████░░░░░░░░░░░░░░░░░ 23.2 Mbps
+
+Testing latency...
+Ping: 12 ms
+Jitter: 2 ms
+
+═══════════════════════════════════════════════════════════
+RESULTS
+═══════════════════════════════════════════════════════════
+
+Download: 98.5 Mbps    ✓ Excellent
+Upload: 23.2 Mbps      ✓ Good
+Latency: 12 ms         ✓ Excellent
+
+Your connection is suitable for:
+✓ HD video streaming
+✓ P2P file sharing
+✓ Distributed storage
+✓ Remote job marketplace
+
+[Save Results] [Test Again] [Exit]
+```
+
+---
+
+### 16.3 Router Configuration for P2P
+
+**Why Needed**: NTARI uses P2P networking, which requires certain ports to be accessible.
+
+#### 16.3.1 Port Forwarding
+
+**NTARI Required Ports**:
+```
+Port Range    Protocol    Service
+─────────────────────────────────────────────────────
+8080          TCP         Web Dashboard (local only)
+8443          TCP         HTTPS Dashboard (local)
+9000-9010     TCP/UDP     P2P Discovery & Messaging
+15000-15100   UDP         STUN/TURN (NAT traversal)
+```
+
+**Optional (UPnP)**:
+- Many routers support UPnP (Universal Plug and Play)
+- NTARI can automatically configure ports via UPnP
+- **Recommended**: Enable UPnP on router
+
+**Manual Port Forwarding** (if UPnP disabled):
+```
+Example (Generic Router):
+1. Access router: http://192.168.1.1
+2. Login (usually admin/admin or see router label)
+3. Find "Port Forwarding" or "NAT" settings
+4. Add rule:
+   ┌──────────────────────────────────────┐
+   │ Service Name: NTARI-P2P              │
+   │ External Port: 9000-9010             │
+   │ Internal IP: 192.168.1.100 (your PC) │
+   │ Internal Port: 9000-9010             │
+   │ Protocol: Both (TCP+UDP)             │
+   └──────────────────────────────────────┘
+5. Save/Apply
+```
+
+---
+
+#### 16.3.2 UPnP Configuration
+
+**Check if UPnP is enabled**:
+```bash
+ntari network upnp-status
+
+Output:
+UPnP Status: Enabled ✓
+Router: NETGEAR R7000
+Ports automatically configured:
+  • 9000-9010 TCP/UDP
+  • 15000-15100 UDP
+```
+
+**Enable UPnP on Common Routers**:
+
+**NETGEAR**:
+```
+Advanced → Advanced Setup → UPnP
+[ ✓ Turn UPnP On ]
+```
+
+**TP-Link**:
+```
+Advanced → NAT Forwarding → UPnP
+[ ✓ Enable UPnP ]
+```
+
+**Linksys**:
+```
+Security → Apps and Gaming → UPnP
+[ ✓ Enabled ]
+```
+
+**ASUS**:
+```
+WAN → Internet Connection → Enable UPnP
+[ ✓ Yes ]
+```
+
+---
+
+### 16.4 Firewall Configuration
+
+#### 16.4.1 Built-in Firewall (iptables)
+
+**NTARI Default Rules**:
+- ✅ Allows all outgoing connections
+- ✅ Allows incoming on P2P ports (9000-9010)
+- ❌ Blocks all other incoming by default
+
+**View firewall status**:
+```bash
+ntari network firewall-status
+
+Output:
+Firewall: Active ✓
+
+Allowed incoming:
+  • Port 9000-9010 (NTARI P2P)
+  • Port 8080 (Dashboard, local only)
+  • Established connections
+
+Blocked:
+  • All other incoming connections
+```
+
+**Temporarily disable** (troubleshooting only):
+```bash
+sudo ntari network firewall-disable
+# Warning: This reduces security!
+# Re-enable after testing: ntari network firewall-enable
+```
+
+---
+
+#### 16.4.2 Windows Firewall (Dual-Boot)
+
+**If dual-booting with Windows**:
+Windows Firewall can interfere even when booted into NTARI.
+
+**Solution**: NTARI installer adds firewall exception automatically
+
+**Manual check** (in Windows):
+```
+Windows Security → Firewall & network protection
+→ Allow an app through firewall
+→ Search for "NTARI"
+→ Ensure [ ✓ Public ] and [ ✓ Private ] are checked
+```
+
+---
+
+### 16.5 DNS Configuration
+
+#### 16.5.1 Default DNS Servers
+
+**NTARI Uses** (in order):
+1. Router's DNS (from DHCP)
+2. Cloudflare: 1.1.1.1, 1.0.0.1
+3. Google: 8.8.8.8, 8.8.4.4
+
+**View current DNS**:
+```bash
+cat /etc/resolv.conf
+
+Output:
+nameserver 192.168.1.1
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+```
+
+---
+
+#### 16.5.2 Custom DNS Configuration
+
+**Change DNS servers**:
+```bash
+sudo ntari network set-dns 1.1.1.1 9.9.9.9
+
+# Or edit directly:
+sudo nano /etc/resolv.conf
+```
+
+**Popular DNS Options**:
+| Provider | Primary | Secondary | Features |
+|----------|---------|-----------|----------|
+| Cloudflare | 1.1.1.1 | 1.0.0.1 | Fast, privacy-focused |
+| Google | 8.8.8.8 | 8.8.4.4 | Reliable, widely used |
+| Quad9 | 9.9.9.9 | 149.112.112.112 | Malware blocking |
+| OpenDNS | 208.67.222.222 | 208.67.220.220 | Content filtering |
+
+---
+
+### 16.6 Network Troubleshooting
+
+#### 16.6.1 "No Internet" Issues
+
+**Symptom**: Connected to WiFi/Ethernet but no internet
+
+**Diagnostic Steps**:
+```bash
+# Step 1: Check if interface is up
+ip link show
+# Should see "state UP" for eth0 or wlan0
+
+# Step 2: Check IP address assigned
+ip addr show
+# Should see IP like 192.168.x.x
+
+# Step 3: Ping gateway
+ping -c 4 192.168.1.1
+# Should get replies
+
+# Step 4: Ping internet
+ping -c 4 8.8.8.8
+# Should get replies
+
+# Step 5: Test DNS
+ping -c 4 google.com
+# Should resolve and get replies
+```
+
+**If fails at Step 3** (can't ping gateway):
+- Network configuration issue
+- Wrong subnet
+- Try: `sudo dhclient -r && sudo dhclient eth0`
+
+**If fails at Step 4** (can't ping internet):
+- Gateway/router issue
+- Check router is online
+- Restart router
+
+**If fails at Step 5** (can't resolve DNS):
+- DNS issue
+- Try: `sudo ntari network set-dns 8.8.8.8 1.1.1.1`
+
+---
+
+#### 16.6.2 Slow Network Performance
+
+**Diagnosis**:
+```bash
+# Run speed test
+ntari network speed
+
+# Check for packet loss
+ping -c 100 8.8.8.8
+# Look for "0% packet loss"
+
+# Check WiFi signal strength (if using WiFi)
+nmcli device wifi list
+# Look at SIGNAL (should be >50%)
+```
+
+**Solutions**:
+- **WiFi**: Move closer to router, switch to 5GHz if available
+- **Ethernet**: Try different cable, check for 1000 Mbps link speed
+- **Router**: Restart router, check for firmware updates
+
+---
+
+## 17. Driver Support Matrix
+
+### 17.1 WiFi Drivers
+
+**Purpose**: Comprehensive WiFi chipset compatibility and driver requirements
+
+#### 17.1.1 Intel WiFi Chipsets (Excellent Support)
+
+| Chipset | WiFi Standard | Package | Auto-Install? | Status |
+|---------|---------------|---------|---------------|--------|
+| Intel AX210 | WiFi 6E | linux-firmware-iwlwifi | Yes | Gold |
+| Intel AX201 | WiFi 6 | linux-firmware-iwlwifi | Yes | Gold |
+| Intel AX200 | WiFi 6 | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 9560 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 9462 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 9260 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 8265 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 8260 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 7265 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+| Intel 7260 | WiFi 5 (ac) | linux-firmware-iwlwifi | Yes | Gold |
+
+**Installation**: Automatic during setup
+**Driver**: `iwlwifi` (kernel module, included)
+**Firmware**: Installed from `linux-firmware-iwlwifi` package
+
+---
+
+#### 17.1.2 Realtek WiFi Chipsets (Good Support with Firmware)
+
+| Chipset | WiFi Standard | Package | Auto-Install? | Status |
+|---------|---------------|---------|---------------|--------|
+| RTL8822CE | WiFi 5 (ac) | rtl8822ce-dkms | Yes | Silver |
+| RTL8821CE | WiFi 5 (ac) | rtl8821ce-dkms | Yes | Silver |
+| RTL8723DE | WiFi 4 (n) | rtl8723de-dkms | Yes | Silver |
+| RTL8192EU | WiFi 4 (n) USB | rtl8192eu-dkms | Yes | Silver |
+| RTL8188EUS | WiFi 4 (n) USB | Not available | No | Bronze |
+
+**Installation**: Automatic during setup (except RTL8188EUS)
+**Driver**: DKMS module (built during installation)
+**Note**: Requires kernel headers (`linux-headers` package auto-installed)
+
+---
+
+#### 17.1.3 Qualcomm Atheros Chipsets (Good Support)
+
+| Chipset | WiFi Standard | Package | Auto-Install? | Status |
+|---------|---------------|---------|---------------|--------|
+| QCA6174 | WiFi 5 (ac) | ath10k-firmware | Yes | Gold |
+| QCA9377 | WiFi 5 (ac) | ath10k-firmware | Yes | Gold |
+| AR9485 | WiFi 4 (n) | linux-firmware-ath | Yes | Gold |
+| AR9462 | WiFi 4 (n) | linux-firmware-ath | Yes | Gold |
+| AR9287 | WiFi 4 (n) | linux-firmware-ath | Yes | Gold |
+
+**Installation**: Automatic during setup
+**Driver**: `ath10k`, `ath9k` (kernel modules, included)
+**Firmware**: Installed from respective firmware packages
+
+---
+
+#### 17.1.4 Broadcom Chipsets (Varies)
+
+| Chipset | WiFi Standard | Package | Auto-Install? | Status | Notes |
+|---------|---------------|---------|---------------|--------|-------|
+| BCM43602 | WiFi 5 (ac) | broadcom-wl | Prompt user | Silver | MacBook Pro 2015+ |
+| BCM4360 | WiFi 5 (ac) | broadcom-wl | Prompt user | Silver | iMac, MacBook Air |
+| BCM4331 | WiFi 4 (n) | broadcom-wl | Prompt user | Silver | Older Macs |
+| BCM4352 | WiFi 5 (ac) | broadcom-wl | Prompt user | Bronze | Some variants problematic |
+| BCM4311 | WiFi 4 (g) | Not supported | No | Incompatible | Very old, use USB adapter |
+
+**Installation**: User prompted to install proprietary driver
+**Driver**: `wl` (proprietary Broadcom STA driver)
+**License**: Proprietary (user must accept)
+
+**Installation Prompt**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Proprietary Driver Required                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Your WiFi adapter (Broadcom BCM4360) requires a            │
+│ proprietary driver.                                         │
+│                                                             │
+│ License: Broadcom Corporation (proprietary)                 │
+│ Package: broadcom-wl                                        │
+│                                                             │
+│ Install proprietary driver?                                 │
+│                                                             │
+│ [ ] I accept the Broadcom license agreement                │
+│                                                             │
+│ [Decline - Use Ethernet] [Accept & Install]                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 17.1.5 MediaTek Chipsets (Excellent Support)
+
+| Chipset | WiFi Standard | Package | Auto-Install? | Status |
+|---------|---------------|---------|---------------|--------|
+| MT7921 | WiFi 6E | linux-firmware-mediatek | Yes | Gold |
+| MT7921K | WiFi 6 | linux-firmware-mediatek | Yes | Gold |
+| MT7922 | WiFi 6E | linux-firmware-mediatek | Yes | Gold |
+
+**Installation**: Automatic during setup
+**Driver**: `mt76` (kernel module, included)
+**Firmware**: Installed from `linux-firmware-mediatek` package
+
+---
+
+### 17.2 GPU Drivers
+
+#### 17.2.1 Intel Integrated Graphics (Excellent Support)
+
+**Driver**: `xf86-video-intel` (included by default)
+
+**Supported GPUs**:
+- Intel HD Graphics (Gen 6-12)
+- Intel UHD Graphics (Gen 9+)
+- Intel Iris Graphics (all generations)
+- Intel Iris Xe Graphics
+
+**Status**: ✅ Works out-of-box, no configuration needed
+
+**Features**:
+- ✅ Full 2D/3D acceleration
+- ✅ Video decode (VAAPI)
+- ✅ Multiple monitor support
+- ✅ 4K displays
+
+---
+
+#### 17.2.2 AMD Integrated Graphics (Excellent Support)
+
+**Driver**: `xf86-video-amdgpu` (included by default)
+
+**Supported GPUs**:
+- AMD Radeon Vega (Ryzen 2000-7000 series APUs)
+- AMD Radeon (Ryzen 5000/6000/7000 mobile)
+- AMD Radeon RX (discrete cards)
+
+**Status**: ✅ Works out-of-box, no configuration needed
+
+**Features**:
+- ✅ Full 2D/3D acceleration
+- ✅ Video decode (VAAPI)
+- ✅ FreeSync support
+- ✅ Vulkan support
+
+---
+
+#### 17.2.3 NVIDIA Discrete Graphics (Good Support with Driver)
+
+**Open-Source Driver**: `nouveau` (included by default)
+- ✅ Works out-of-box
+- ⚠️ Limited 3D performance (no power management)
+- ⚠️ No video encode
+- ✅ Multiple monitors work
+
+**Proprietary Driver**: `nvidia-driver` (NOT included)
+- ✅ Full 3D performance
+- ✅ CUDA support
+- ✅ Video encode/decode (NVENC/NVDEC)
+- ✅ Power management
+- ❌ Requires manual installation
+
+**Supported GPUs** (with proprietary driver):
+- GeForce GTX 10-series (1050, 1060, 1070, 1080)
+- GeForce GTX 16-series (1650, 1660)
+- GeForce RTX 20-series (2060, 2070, 2080)
+- GeForce RTX 30-series (3050, 3060, 3070, 3080, 3090)
+- GeForce RTX 40-series (4060, 4070, 4080, 4090)
+
+**Installation Prompt**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ NVIDIA Graphics Detected                           [3 of 9] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ GPU: NVIDIA GeForce GTX 1060                                │
+│                                                             │
+│ Driver Options:                                             │
+│                                                             │
+│ ( ) Nouveau (open-source)                                  │
+│     • Works immediately                                     │
+│     • Limited 3D performance                                │
+│     • Lower power consumption                               │
+│                                                             │
+│ (•) NVIDIA Proprietary Driver (recommended)                │
+│     • Full 3D performance                                   │
+│     • CUDA support for compute jobs                         │
+│     • Video encoding/decoding acceleration                  │
+│     • Requires accepting NVIDIA license                     │
+│                                                             │
+│ [ ] I accept the NVIDIA Software License Agreement         │
+│                                                             │
+│ [ Use Nouveau ] [ Install Proprietary Driver → ]           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Manual Installation** (post-install):
+```bash
+# Install NVIDIA driver
+sudo apk add nvidia-driver nvidia-settings
+
+# Reboot
+sudo reboot
+
+# Verify installation
+nvidia-smi
+```
+
+---
+
+#### 17.2.4 NVIDIA Optimus Laptops (Complex)
+
+**What is Optimus**: Hybrid graphics (Intel integrated + NVIDIA discrete)
+
+**Challenge**: Switching between GPUs requires special configuration
+
+**NTARI Support**:
+
+**Option 1: Disable Discrete GPU** (Recommended for simplicity):
+```
+1. Enter BIOS
+2. Find "Graphics" or "Video" settings
+3. Set to "Integrated" or "UMA" only
+4. Save and reboot
+Result: Only Intel GPU used, NVIDIA disabled
+Benefit: Simple, works out-of-box
+Drawback: No NVIDIA performance
+```
+
+**Option 2: Use NVIDIA Only** (Performance):
+```
+1. Enter BIOS
+2. Find "Graphics" or "Video" settings
+3. Set to "Discrete" only
+4. Save and reboot
+Result: Only NVIDIA GPU used
+Benefit: Full performance
+Drawback: Higher power consumption
+```
+
+**Option 3: Optimus Switching** (Advanced):
+```bash
+# Install PRIME support
+sudo apk add nvidia-prime
+
+# Switch to NVIDIA
+sudo prime-select nvidia
+
+# Switch to Intel
+sudo prime-select intel
+
+# Reboot required after switching
+```
+
+**Status**: Bronze tier - requires manual configuration
+
+---
+
+### 17.3 Printer Drivers
+
+#### 17.3.1 CUPS (Common UNIX Printing System)
+
+**Included in**: Desktop Edition only
+
+**Packages**:
+```
+cups                       # Print server
+cups-filters               # Filter drivers
+system-config-printer      # GUI configuration tool
+```
+
+---
+
+#### 17.3.2 Manufacturer-Specific Drivers
+
+**HP Printers** (Excellent Support):
+```
+Package: hplip (HP Linux Imaging and Printing)
+
+Supported:
+- HP LaserJet series
+- HP OfficeJet series
+- HP DeskJet series
+- HP Envy series
+
+Installation: Included in Desktop Edition
+Status: ✅ Auto-detected via USB or network
+```
+
+**Epson/Canon Printers** (Good Support):
+```
+Package: gutenprint
+
+Supported:
+- Most Epson inkjet printers
+- Many Canon printers
+- Generic PCL/PostScript printers
+
+Installation: Included in Desktop Edition
+Status: ✅ Most models work
+```
+
+**Brother Printers** (Good Support):
+```
+Package: brother-cups-wrapper (available from Alpine)
+
+Installation: Manual
+```bash
+sudo apk add brother-cups-wrapper
+```
+```
+
+**Generic Printers**:
+```
+Many printers support:
+- IPP (Internet Printing Protocol)
+- PostScript
+- PCL (Printer Command Language)
+
+These work with built-in drivers.
+```
+
+---
+
+#### 17.3.3 Network Printer Discovery
+
+**Automatic Discovery**:
+```
+NTARI automatically discovers network printers via:
+- Avahi/mDNS (Apple Bonjour)
+- CUPS browsing
+- SMB/Samba (Windows shared printers)
+
+Just plug printer into network, it should appear
+in "Add Printer" dialog.
+```
+
+---
+
+### 17.4 Scanner Drivers
+
+**Package**: `sane` (Scanner Access Now Easy)
+
+**Included in**: Desktop Edition
+
+**Supported Scanners**:
+- Most HP multifunction printers (via hpaio backend)
+- Most Epson scanners (via epson2 backend)
+- Many Canon scanners (via pixma backend)
+- Generic USB scanners
+
+**GUI Application**: `simple-scan`
+
+**Test if scanner works**:
+```bash
+# List detected scanners
+scanimage -L
+
+# Example output:
+device `hpaio:/usb/OfficeJet_Pro_8600?serial=XXXXXXXX' is a HP OfficeJet Pro 8600
+```
+
+---
+
+### 17.5 Webcam Support
+
+**Driver**: V4L2 (Video4Linux2) - built into kernel
+
+**Status**: ✅ Most USB webcams work out-of-box
+
+**Supported**:
+- Logitech webcams (excellent support)
+- Microsoft LifeCam series
+- Generic UVC (USB Video Class) webcams
+- Built-in laptop webcams
+
+**Test webcam**:
+```bash
+# List video devices
+ls /dev/video*
+
+# Test with Cheese (Desktop Edition)
+cheese
+```
+
+**Application Support**:
+- ✅ Cheese (photo/video app)
+- ✅ VLC (can capture from webcam)
+- ✅ Browser (WebRTC works for video calls)
+
+---
+
+### 17.6 Bluetooth Adapters
+
+**Driver**: BlueZ (Linux Bluetooth stack)
+
+**Package**: `bluez` (included in Desktop Edition)
+
+**Supported**:
+- Most Intel Wireless-AC modules (Bluetooth integrated)
+- Qualcomm Atheros Bluetooth
+- Realtek Bluetooth
+- Generic USB Bluetooth adapters
+
+**Status**: ✅ Usually works out-of-box
+
+**GUI**: `blueman` (Bluetooth manager)
+
+**Pairing Devices**:
+```bash
+# Start Bluetooth service
+sudo rc-service bluetooth start
+
+# Use GUI (Desktop Edition)
+blueman-manager
+
+# Or command line
+bluetoothctl
+> power on
+> scan on
+> pair XX:XX:XX:XX:XX:XX
+> connect XX:XX:XX:XX:XX:XX
+```
+
+---
+
+### 17.7 Audio Drivers
+
+#### 17.7.1 ALSA (Advanced Linux Sound Architecture)
+
+**Status**: ✅ Built into kernel, works out-of-box
+
+**Supported**:
+- All motherboard audio (Realtek, VIA, etc.)
+- USB audio devices
+- HDMI/DisplayPort audio
+
+**Test audio**:
+```bash
+# List audio devices
+aplay -l
+
+# Test speakers
+speaker-test -c 2
+
+# Adjust volume
+alsamixer
+```
+
+---
+
+#### 17.7.2 PulseAudio (Desktop Edition)
+
+**Purpose**: User-friendly audio server
+
+**Features**:
+- Per-application volume control
+- Easy output device switching
+- Bluetooth audio support
+- Network audio streaming
+
+**GUI**: `pavucontrol` (PulseAudio Volume Control)
+
+---
+
+### 17.8 Laptop-Specific Drivers
+
+#### 17.8.1 Function Keys (Fn Keys)
+
+**Package**: `laptop-mode-tools` (optional, Desktop Edition)
+
+**Supported**:
+- Brightness control (Fn+F5/F6)
+- Volume control (Fn+F10/F11/F12)
+- WiFi toggle (Fn+F2)
+- Display toggle (Fn+F7)
+
+**Status**: ⚠️ Varies by manufacturer
+- ✅ ThinkPad: Excellent
+- ✅ Dell: Good
+- ⚠️ HP: Mixed (some models need extra config)
+- ⚠️ ASUS: Mixed
+
+**Configuration**:
+```bash
+# Install laptop tools
+sudo apk add laptop-mode-tools
+
+# Enable at boot
+sudo rc-update add laptop_mode default
+```
+
+---
+
+#### 17.8.2 Trackpads
+
+**Driver**: `libinput` or `synaptics`
+
+**Desktop Edition**: Uses `libinput` by default (modern, better)
+
+**Features**:
+- ✅ Two-finger scrolling
+- ✅ Tap to click
+- ✅ Multi-touch gestures
+- ✅ Palm rejection
+
+**Configuration**: Settings → Mouse & Touchpad
+
+---
+
+### 17.9 USB Storage
+
+**Status**: ✅ Works out-of-box
+
+**Supported Filesystems**:
+- ✅ FAT32 (full read/write)
+- ✅ exFAT (requires exfat-utils package)
+- ✅ NTFS (read/write with ntfs-3g)
+- ✅ ext4 (native Linux)
+
+**Auto-mounting**: Desktop Edition auto-mounts USB drives
+
+**Command line**:
+```bash
+# List block devices
+lsblk
+
+# Mount USB drive
+sudo mount /dev/sdb1 /mnt/usb
+
+# Unmount
+sudo umount /mnt/usb
+```
+
+---
+
+## 18. Dual-Boot Implementation
+
+### 18.1 Dual-Boot Overview
+
+**Purpose**: Install NTARI alongside existing Windows/macOS/Linux without removing current OS
+
+**Supported Configurations**:
+- ✅ Windows 10 + NTARI
+- ✅ Windows 11 + NTARI
+- ✅ macOS (Intel Macs) + NTARI
+- ✅ Ubuntu/other Linux + NTARI
+
+---
+
+### 18.2 Disk Partitioning Strategy
+
+#### 18.2.1 Windows + NTARI Dual-Boot
+
+**Example: 256GB SSD**
+
+**Before** (Windows only):
+```
+/dev/sda
+├─ sda1  512MB   EFI System Partition
+├─ sda2  16MB    Microsoft Reserved
+├─ sda3  238GB   Windows (C:) NTFS
+└─ sda4  1GB     Windows Recovery
+```
+
+**After** (Dual-boot):
+```
+/dev/sda
+├─ sda1  512MB   EFI System Partition (shared by both OSes)
+├─ sda2  16MB    Microsoft Reserved (Windows)
+├─ sda3  150GB   Windows (C:) NTFS (resized)
+├─ sda4  1GB     Windows Recovery
+├─ sda5  50GB    NTARI root (/)  ext4
+├─ sda6  4GB     NTARI swap
+└─ sda7  50GB    Shared data (NTFS, accessible from both)
+```
+
+**Installation Process**:
+```
+1. Windows partition shrunk from 238GB to 150GB
+2. 100GB freed space used for:
+   - 50GB NTARI OS
+   - 4GB swap
+   - 50GB shared data partition
+```
+
+---
+
+#### 18.2.2 Recommended Partition Sizes
+
+**Minimum**:
+```
+NTARI root (/):    20GB minimum
+NTARI swap:        2GB (or equal to RAM if <8GB RAM)
+Total minimum:     22GB free space required
+```
+
+**Recommended**:
+```
+NTARI root (/):    50GB (comfortable for apps and updates)
+NTARI swap:        4GB
+Shared partition:  Remaining space
+Total recommended: 60GB+ free space
+```
+
+**For Dual-Boot with Windows**:
+- Keep at least 80GB for Windows (100GB+ recommended)
+- Windows needs free space for updates and temp files
+
+---
+
+### 18.3 GRUB Bootloader Configuration
+
+#### 18.3.1 GRUB Boot Menu
+
+**After Installation**:
+```
+GNU GRUB version 2.06
+
+┌────────────────────────────────────────────────────────┐
+│  NTARI OS                                              │
+│  NTARI OS (recovery mode)                             │
+│  NTARI OS (diagnostic mode)                           │
+│ ──────────────────────────────────────────────────────  │
+│  Windows 11                                            │
+│ ──────────────────────────────────────────────────────  │
+│  UEFI Firmware Settings                                │
+└────────────────────────────────────────────────────────┘
+
+Use ↑ and ↓ to select which entry is highlighted.
+Press enter to boot the selected OS, 'e' to edit the
+commands before booting, or 'c' for a command-line.
+
+Default: NTARI OS in 10 seconds
+```
+
+**Default Boot**: NTARI OS (can be changed)
+
+**Timeout**: 10 seconds (can be changed)
+
+---
+
+#### 18.3.2 Change Default Boot OS
+
+**Method 1: GUI** (Desktop Edition):
+```
+Settings → Boot Manager → Default OS
+Select: [ Windows 11 ▼ ]
+Apply
+```
+
+**Method 2: Command Line**:
+```bash
+# Edit GRUB config
+sudo nano /etc/default/grub
+
+# Find and change:
+GRUB_DEFAULT=0        # 0 = first entry (NTARI)
+GRUB_DEFAULT=3        # 3 = fourth entry (Windows)
+
+# Or use menu entry name:
+GRUB_DEFAULT="Windows 11"
+
+# Update GRUB
+sudo update-grub
+
+# Reboot to test
+sudo reboot
+```
+
+---
+
+#### 18.3.3 Change Timeout
+
+```bash
+# Edit GRUB config
+sudo nano /etc/default/grub
+
+# Find and change:
+GRUB_TIMEOUT=10       # Default (10 seconds)
+GRUB_TIMEOUT=30       # Longer (30 seconds)
+GRUB_TIMEOUT=3        # Shorter (3 seconds)
+GRUB_TIMEOUT=0        # No menu (boots default immediately)
+                      # WARNING: Makes it harder to access other OS
+
+# Update GRUB
+sudo update-grub
+```
+
+---
+
+### 18.4 Safe Dual-Boot Installation Process
+
+#### 18.4.1 Pre-Installation Backup
+
+**Automatic by Installer**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Pre-Installation Backup                            [2 of 8] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Creating safety backup before making changes...             │
+│                                                             │
+│ [1/3] Backing up partition table...                        │
+│   ✓ MBR/GPT table saved to /backup/partition-table.bin     │
+│                                                             │
+│ [2/3] Backing up boot configuration...                     │
+│   ✓ Windows Boot Manager config saved                      │
+│   ✓ EFI entries saved                                      │
+│                                                             │
+│ [3/3] Creating restore point...                            │
+│   ✓ Can restore if installation fails                      │
+│                                                             │
+│ Backups saved to USB drive (accessible if issues occur)    │
+│                                                             │
+│ [ Continue → ]                                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 18.4.2 Non-Destructive Partition Resizing
+
+**Installer uses `ntfsresize`** (safe NTFS resizing):
+```
+Resizing Windows Partition
+─────────────────────────────────────────────────────
+
+Current Windows partition: 238GB
+  └ Used space: 85GB
+  └ Free space: 153GB
+
+Can safely shrink to: 120GB (35GB margin)
+
+Recommended shrink to: 150GB
+  └ Keeps 65GB free in Windows
+  └ Frees 88GB for NTARI
+
+[Cancel] [Continue with 150GB]
+```
+
+**Safety Features**:
+- ✅ Checks file system integrity first
+- ✅ Ensures enough free space in Windows
+- ✅ Leaves 20GB+ safety margin
+- ✅ Backs up partition table before resizing
+- ✅ Verifies resize completed successfully
+
+---
+
+### 18.5 Dual-Boot Windows Quirks
+
+#### 18.5.1 Fast Startup Issue
+
+**Problem**: Windows "Fast Startup" causes dual-boot issues
+
+**Symptoms**:
+- Changes made in Windows don't appear in NTARI
+- Shared partition shows read-only in NTARI
+- Time differences between OSes
+
+**Solution**: Disable Fast Startup in Windows
+
+**Steps** (in Windows):
+```
+1. Control Panel → Power Options
+2. Choose what the power buttons do
+3. Change settings that are currently unavailable
+4. Uncheck "Turn on fast startup (recommended)"
+5. Save changes
+```
+
+**Why**: Fast Startup hibernates instead of full shutdown, locking filesystems
+
+---
+
+#### 18.5.2 Time Synchronization
+
+**Problem**: Windows and NTARI show different times
+
+**Cause**: Windows uses local time for hardware clock, Linux uses UTC
+
+**Solution**: Make NTARI use local time (matches Windows)
+
+**Fix** (in NTARI):
+```bash
+# Set hardware clock to local time
+sudo timedatectl set-local-rtc 1
+
+# Verify
+timedatectl
+# Should show: RTC in local TZ: yes
+```
+
+**Alternative**: Make Windows use UTC (advanced)
+```powershell
+# In Windows (as Administrator):
+reg add "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /d 1 /t REG_DWORD /f
+```
+
+---
+
+#### 18.5.3 Accessing Windows Files from NTARI
+
+**Windows Partition Auto-Mounted**:
+```
+Location: /mnt/windows
+Accessible from: File Manager → "Windows (C:)"
+```
+
+**Read/Write Support**: ✅ Full read/write via ntfs-3g
+
+**Documents Location**:
+```
+/mnt/windows/Users/YourName/Documents
+/mnt/windows/Users/YourName/Downloads
+/mnt/windows/Users/YourName/Desktop
+```
+
+**Shared Partition** (NTFS):
+```
+Location: /mnt/shared
+Accessible from both Windows and NTARI
+Good for: Files you use in both OSes
+```
+
+---
+
+### 18.6 Boot Repair After Windows Update
+
+**Problem**: Windows updates sometimes overwrite GRUB
+
+**Symptom**: Computer boots directly to Windows, GRUB menu gone
+
+**Solution**: Reinstall GRUB from NTARI USB
+
+**Steps**:
+```
+1. Boot from NTARI USB
+2. Select "Troubleshooting"
+3. Select "Boot Repair"
+4. Choose "Reinstall GRUB"
+5. Select disk (usually /dev/sda)
+6. Confirm
+7. Wait for completion
+8. Remove USB and reboot
+9. GRUB menu should appear again
+```
+
+**Prevent Future Issues**:
+- Windows updates are unpredictable
+- Keep NTARI USB installer handy
+- Bookmark boot repair instructions
+
+---
+
+### 18.7 Uninstalling NTARI (Reverting to Windows Only)
+
+**Safe Uninstall Process**:
+
+**From Windows**:
+```
+1. Disk Management
+   └ Right-click NTARI partitions (ext4)
+   └ Delete Volume
+   └ Extend Windows partition into freed space
+
+2. Fix boot (remove GRUB)
+   └ Open Command Prompt as Administrator
+   └ Run: bootrec /fixmbr
+   └ Run: bootrec /fixboot
+   └ Reboot - should boot directly to Windows
+
+3. Clean up EFI entries (optional)
+   └ Run: bcdedit /enum firmware
+   └ Find NTARI entry
+   └ Run: bcdedit /delete {entry-id}
+```
+
+**From NTARI USB**:
+```
+1. Boot from USB
+2. Select "Troubleshooting"
+3. Select "Uninstall NTARI OS"
+4. Confirm: "Remove NTARI and restore Windows boot"
+5. Wait for completion
+6. Reboot
+```
+
+---
+
+### 18.8 Triple-Boot (Windows + NTARI + Another Linux)
+
+**Supported**: ✅ Yes, GRUB can handle multiple OSes
+
+**Example Configuration**:
+```
+/dev/sda (512GB SSD)
+├─ sda1  512MB   EFI (shared)
+├─ sda2  150GB   Windows 11
+├─ sda3  100GB   Ubuntu 22.04
+├─ sda4  100GB   NTARI OS
+├─ sda5  8GB     Shared swap
+└─ sda6  150GB   Shared data (NTFS)
+```
+
+**GRUB Menu**:
+```
+GNU GRUB
+  NTARI OS
+  NTARI OS (recovery)
+  ──────────────────────
+  Ubuntu 22.04
+  Ubuntu (recovery)
+  ──────────────────────
+  Windows 11
+  ──────────────────────
+  UEFI Firmware
+```
+
+**Installation Order** (Recommended):
+1. Windows (first)
+2. Ubuntu or other Linux
+3. NTARI OS (last)
+
+**Why**: NTARI installer will detect all existing OSes and add them to GRUB
+
+---
+
+### 18.9 Dual-Boot Installation Wizard
+
+**Screen 3: Installation Type**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Installation Type                                   [3 of 8]│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ How would you like to install NTARI OS?                    │
+│                                                             │
+│ ○ Replace existing OS (erase disk)                         │
+│   └ WARNING: All data on disk will be lost                 │
+│   └ Single-boot NTARI only                                 │
+│                                                             │
+│ ● Install alongside Windows 11 (dual-boot)  ◄─ SELECTED   │
+│   └ Recommended for trying NTARI                           │
+│   └ Choose which OS to boot at startup                     │
+│   └ Requires 60GB free space                               │
+│                                                             │
+│ ○ Custom partitioning (advanced)                           │
+│   └ Manual control over partitions                         │
+│                                                             │
+│ [ ← Back ]                              [ Continue → ]      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Screen 4: Partition Preview**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Dual-Boot Configuration                             [4 of 8]│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Current Disk Layout:                                        │
+│ ┌───────────────────────────────────────────────────────┐  │
+│ │ Windows 11 (238GB)                                    │  │
+│ └───────────────────────────────────────────────────────┘  │
+│                                                             │
+│ Proposed Changes:                                           │
+│ ┌──────────────────────────┬──────────────────────────────┐│
+│ │ Windows 11 (150GB)       │ NTARI OS (50GB)              ││
+│ │                          │ Swap (4GB)                   ││
+│ │                          │ Shared (34GB)                ││
+│ └──────────────────────────┴──────────────────────────────┘│
+│                                                             │
+│ Windows will be resized from 238GB to 150GB                │
+│ NTARI will use 88GB of freed space                         │
+│                                                             │
+│ ⚠ Important:                                                │
+│ • Windows will remain fully functional                     │
+│ • All Windows files will be preserved                       │
+│ • You can choose which OS to boot at startup              │
+│                                                             │
+│ [ ← Back ] [ Customize ] [ Continue → ]                    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+**END OF NEW SECTIONS**
+
+These sections (13-18) should be inserted into the v1.4 specification before Section 12 (Appendices), bringing the total specification to approximately 7,000 lines with comprehensive coverage of hardware compatibility, installation support, troubleshooting, BIOS configuration, networking, drivers, and dual-boot implementation.

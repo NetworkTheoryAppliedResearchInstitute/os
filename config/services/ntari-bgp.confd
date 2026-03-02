@@ -1,0 +1,14 @@
+# NTARI OS — BGP Node Configuration
+# /etc/conf.d/ntari-bgp
+#
+# ntari-bgp is NOT auto-enabled. Enable with:
+#   rc-update add ntari-bgp default
+#
+# Edit /etc/ntari/bird.conf to configure your ASN and BGP peers
+# before starting this service.
+
+# Path to the Bird2 configuration file
+NTARI_BGP_CONF=/etc/ntari/bird.conf
+
+# Health publish interval in seconds
+NTARI_BGP_HEALTH_INTERVAL=30

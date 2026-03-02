@@ -1,0 +1,25 @@
+# NTARI OS — ntari-cache OpenRC service configuration
+# /etc/conf.d/ntari-cache
+#
+# This file is sourced by the ntari-cache OpenRC init script.
+# ntari-cache wraps Redis with ROS2 graph health publishing.
+# Redis itself is configured in /etc/ntari/redis.conf.
+
+# Path to the Redis configuration file.
+# The init script writes a default if this does not exist.
+NTARI_CACHE_REDIS_CONF="/etc/ntari/redis.conf"
+
+# Health publish interval in seconds.
+NTARI_CACHE_HEALTH_INTERVAL=30
+
+# ROS2 domain ID for health topic publishing.
+# Must match ROS_DOMAIN_ID in /etc/conf.d/ros2-domain.
+ROS_DOMAIN_ID=0
+
+# RMW implementation
+RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"
+
+# Memory limit passed to redis-server via CONFIG SET at startup.
+# Overrides maxmemory in redis.conf if set.
+# Leave empty to use whatever is in redis.conf (default: 64mb)
+NTARI_CACHE_MAXMEMORY=""

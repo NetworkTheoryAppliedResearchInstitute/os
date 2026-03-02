@@ -1,0 +1,23 @@
+# NTARI OS — ROS2 Domain Service Configuration
+# /etc/conf.d/ros2-domain
+#
+# This file is sourced by the ros2-domain OpenRC service.
+# Override any of these values for site-specific deployments.
+
+# DDS domain ID. All nodes on the same cooperative must share this value.
+# Range: 0–232. Default: 0.
+# Change this if running multiple independent DDS domains on the same network.
+ROS_DOMAIN_ID=0
+
+# RMW implementation. Must be Cyclone DDS for NTARI OS.
+# Do not change unless you know what you are doing.
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# Cyclone DDS XML configuration file path.
+# If the file exists, it is passed as CYCLONEDDS_URI at startup.
+# See /etc/ntari/cyclonedds.xml (created by setup-ros2.sh).
+CYCLONEDDS_URI_FILE="/etc/ntari/cyclonedds.xml"
+
+# ROS2 installation prefix. Only change if you installed ROS2
+# to a non-standard location.
+ROS_INSTALL_PREFIX="/opt/ros/jazzy"

@@ -1,0 +1,185 @@
+#!/sbin/openrc-run
+# NTARI OS — Cooperative Federation Service (ntari_federation_node)
+# Phase 9: Cooperative Federation
+#
+# Manages the DDS domain bridge between:
+#   - Domain 0 (local cooperative LAN, multicast)
+#   - Domain 1 (federation overlay, WireGuard unicast)
+#
+# The bridge re-publishes /ntari/* health and status topics from the local
+# domain into the federation domain under the cooperative's UUID namespace,
+# and re-publishes peer cooperative topics back into the local domain.
+# The Phase 8 globe bridge then shows all cooperative nodes in one view.
+#
+# Boot dependencies:
+#   - Requires ntari-vpn (WireGuard interface must be up before bridging)
+#   - Requires ros2-domain (local domain 0 daemon must be running)
+#   - After all service nodes (so there is content to bridge at startup)
+#   - After ntari-ntp (clocks must be synced for DDS QoS timestamps)
+
+name="ntari-federation"
+description="NTARI Cooperative Federation Bridge — DDS domain 0 ↔ domain 1 via WireGuard"
+
+command="/usr/local/bin/ntari-federation.sh"
+command_args="start"
+command_background="yes"
+pidfile="/run/ntari-federation/bridge.pid"
+command_user="root"
+
+output_log="/var/log/ntari/federation.log"
+error_log="/var/log/ntari/federation.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+# Federation-specific env (sourced from conf.d)
+export NTARI_FED_DOMAIN="${NTARI_FED_DOMAIN:-1}"
+export NTARI_FED_INTERVAL="${NTARI_FED_INTERVAL:-5}"
+export NTARI_VPN_IFACE="${NTARI_VPN_IFACE:-wg-ntari}"
+export NTARI_FED_LOG="/var/log/ntari/federation.log"
+
+depend() {
+    need ros2-domain
+    need ntari-vpn
+    after ntari-ntp ntari-dns ntari-cache ntari-web
+    after ntari-identity ntari-files
+    # globe bridge benefits from seeing peer nodes
+    before ntari-globe-bridge
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+    mkdir -p /run/ntari-federation
+
+    if [ ! -x /usr/local/bin/ntari-federation.sh ]; then
+        eerror "ntari-federation.sh not found at /usr/local/bin/"
+        return 1
+    fi
+
+    # Verify WireGuard interface is up
+    if ! ip link show "${NTARI_VPN_IFACE}" >/dev/null 2>&1; then
+        eerror "WireGuard interface ${NTARI_VPN_IFACE} not found"
+        eerror "Start ntari-vpn and configure /etc/ntari/wireguard/wg-ntari.conf first"
+        return 1
+    fi
+
+    # Warn if no peers configured
+    PEER_COUNT=$(wg show "${NTARI_VPN_IFACE}" peers 2>/dev/null | wc -l || echo "0")
+    if [ "${PEER_COUNT}" -eq 0 ]; then
+        ewarn "No WireGuard peers configured on ${NTARI_VPN_IFACE}"
+        ewarn "Federation bridge will start but no cross-cooperative data will flow"
+        ewarn "Add peers to /etc/ntari/wireguard/wg-ntari.conf and restart ntari-vpn"
+    fi
+
+    # Write the federation-domain Cyclone DDS config if absent
+    if [ ! -f /etc/ntari/cyclonedds-federation.xml ]; then
+        einfo "Writing federation Cyclone DDS config"
+        # Get WireGuard peer IPs for unicast peer list
+        WG_PEERS=""
+        if command -v wg >/dev/null 2>&1; then
+            WG_PEERS=$(wg show "${NTARI_VPN_IFACE}" allowed-ips 2>/dev/null \
+                       | awk '{print $2}' | sed 's|/.*||' \
+                       | while read -r ip; do
+                           echo "          <Peer address=\"${ip}\"/>"
+                         done)
+        fi
+        cat > /etc/ntari/cyclonedds-federation.xml <<FEDXML_EOF
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  NTARI OS — Cyclone DDS Configuration (Federation Domain)
+  /etc/ntari/cyclonedds-federation.xml
+
+  Used exclusively by the federation bridge (domain ${NTARI_FED_DOMAIN}).
+  Key differences from the local config (cyclonedds.xml):
+    - Multicast DISABLED (WireGuard is point-to-point, not multicast-capable)
+    - Peers are explicit WireGuard overlay IPs
+    - Interface bound to the WireGuard interface only
+-->
+<CycloneDDS>
+  <Domain id="any">
+    <General>
+      <!-- Bind ONLY to the WireGuard interface, not the LAN -->
+      <Interfaces>
+        <NetworkInterface name="${NTARI_VPN_IFACE}" multicast="false" />
+      </Interfaces>
+      <!-- No multicast on WireGuard -->
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <EnableTopicDiscoveryEndpoints>true</EnableTopicDiscoveryEndpoints>
+      <!-- Static peer list: WireGuard overlay IPs of peer cooperatives -->
+      <!-- Add each peer's WireGuard IP here when configuring federation -->
+      <Peers>
+${WG_PEERS}
+        <!-- Example: <Peer address="10.99.0.2"/> -->
+      </Peers>
+    </Discovery>
+    <Internal>
+      <DeliveryQueueMaxSamples>256</DeliveryQueueMaxSamples>
+      <MaxMessageSize>65500B</MaxMessageSize>
+    </Internal>
+    <Tracing>
+      <Verbosity>warning</Verbosity>
+      <OutputFile>/var/log/ntari/cyclonedds-federation.log</OutputFile>
+    </Tracing>
+  </Domain>
+</CycloneDDS>
+FEDXML_EOF
+        chmod 640 /etc/ntari/cyclonedds-federation.xml
+        log "Federation Cyclone DDS config written"
+    fi
+
+    UUID_FILE="/var/lib/ntari/identity/node-uuid"
+    if [ -f "${UUID_FILE}" ]; then
+        UUID=$(cat "${UUID_FILE}")
+        einfo "Federation bridge starting (cooperative UUID: ${UUID})"
+    else
+        einfo "Federation bridge starting (UUID will be generated on first run)"
+    fi
+
+    einfo "Local domain: ${ROS_DOMAIN_ID} → Federation domain: ${NTARI_FED_DOMAIN}"
+    einfo "WireGuard interface: ${NTARI_VPN_IFACE} (${PEER_COUNT} peers)"
+}
+
+start_post() {
+    sleep 3
+
+    # Verify federation daemon started on domain 1
+    export ROS_DOMAIN_ID="${NTARI_FED_DOMAIN}"
+    if [ -f /etc/ntari/cyclonedds-federation.xml ]; then
+        export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds-federation.xml"
+    fi
+    if ros2 daemon status >/dev/null 2>&1; then
+        einfo "Federation ROS2 daemon active on domain ${NTARI_FED_DOMAIN}"
+    else
+        ewarn "Federation domain daemon not yet responding (bridge will retry)"
+    fi
+
+    # Restore local domain env for any subsequent commands
+    export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+    if [ -f /etc/ntari/cyclonedds.xml ]; then
+        export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+    fi
+
+    einfo "Federation bridge running — /ntari/federation/health active"
+    einfo "Peer nodes appear as /ntari/peers/<uuid>/* on local domain"
+}
+
+stop_pre() {
+    einfo "Stopping federation bridge"
+    # Ask the bridge script to clean up (stops federation daemon too)
+    /usr/local/bin/ntari-federation.sh stop >> /var/log/ntari/federation.log 2>&1 || true
+}

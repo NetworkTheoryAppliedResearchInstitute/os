@@ -1,0 +1,203 @@
+#!/sbin/openrc-run
+# NTARI OS — Cache Node (ntari_cache_node)
+# Phase 7: Services Layer
+#
+# Wraps Redis as a ROS2 lifecycle node.
+# Redis provides the shared memory layer for:
+#   - DDS message caching (last-known-good values for slow-changing topics)
+#   - Globe interface session state (selected node, viewport position)
+#   - Phase 8 WebSocket bridge state (subscribed topic list per client)
+#   - Cross-service coordination (ntari-dns cache invalidation, etc.)
+#
+# Publishes /ntari/cache/health and /ntari/cache/status to the DDS graph.
+# The status topic includes memory usage, hit ratio, and connected client count.
+#
+# Boot dependencies:
+#   - Requires ros2-domain (DDS graph up before health publishing)
+#   - Requires net
+#   - After ntari-ntp (clocks synchronized before Redis RDB snapshots)
+#   - Before ntari-web (globe interface needs session state store)
+
+name="ntari-cache"
+description="NTARI Cache Node — Redis + ROS2 health publishing"
+
+REDIS_CONF="${NTARI_CACHE_REDIS_CONF:-/etc/ntari/redis.conf}"
+command="/usr/bin/redis-server"
+command_args="${REDIS_CONF}"
+command_background="yes"
+pidfile="/run/ntari-cache.pid"
+command_user="redis"
+
+output_log="/var/log/ntari/cache.log"
+error_log="/var/log/ntari/cache.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    after ntari-ntp
+    before ntari-web
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+    mkdir -p /var/lib/ntari/redis
+
+    # Ensure the redis user and data directory have correct ownership
+    if id redis >/dev/null 2>&1; then
+        chown redis:redis /var/lib/ntari/redis 2>/dev/null || true
+    fi
+
+    # Write a default Redis config if one doesn't exist
+    if [ ! -f "${REDIS_CONF}" ]; then
+        mkdir -p "$(dirname "${REDIS_CONF}")"
+        einfo "Writing default Redis config: ${REDIS_CONF}"
+        cat > "${REDIS_CONF}" <<'REDIS_EOF'
+# NTARI OS — Redis configuration
+# /etc/ntari/redis.conf
+#
+# Optimized for edge hardware:
+#   - Conservative memory limit (64MB)
+#   - Unix socket for low-latency local access
+#   - TCP binding on 127.0.0.1 only (not exposed to network)
+#   - No persistence by default (in-memory cache only; use RDB for session state)
+
+# Bind to loopback only — do not expose Redis to the cooperative network.
+# If inter-node caching is needed, use WireGuard tunnel + explicit bind.
+bind 127.0.0.1
+
+# Default port
+port 6379
+
+# Unix socket for lower-latency local access by globe bridge and web node
+unixsocket /run/redis/redis.sock
+unixsocketperm 770
+
+# Run in foreground — OpenRC (command_background=yes) manages the PID via
+# --make-pidfile. Do NOT set 'daemonize yes' or a redis 'pidfile' here,
+# as that would conflict with OpenRC's own pidfile tracking.
+daemonize no
+
+# Log file
+logfile /var/log/ntari/redis.log
+loglevel notice
+
+# Data directory (for RDB snapshots if enabled)
+dir /var/lib/ntari/redis
+
+# Memory limit for edge hardware
+maxmemory 64mb
+maxmemory-policy allkeys-lru
+
+# Persistence: disabled by default (pure cache).
+# Enable RDB snapshots for session state persistence across reboots:
+#   save 900 1
+#   save 300 10
+#   save 60 10000
+save ""
+
+# No password by default (loopback-only; tighten in multi-tenant deployments)
+# requirepass yourpassword
+
+# Max connected clients (conservative for edge hardware)
+maxclients 64
+
+# Disable dangerous commands in production
+rename-command FLUSHALL ""
+rename-command FLUSHDB  ""
+rename-command DEBUG    ""
+REDIS_EOF
+        chmod 640 "${REDIS_CONF}"
+        # Redis must be able to read its own config
+        if id redis >/dev/null 2>&1; then
+            chown root:redis "${REDIS_CONF}" 2>/dev/null || true
+        fi
+    fi
+
+    # Ensure redis unix socket directory exists
+    mkdir -p /run/redis
+    if id redis >/dev/null 2>&1; then
+        chown redis:redis /run/redis 2>/dev/null || true
+    fi
+
+    # Verify Redis binary
+    if [ ! -x /usr/bin/redis-server ]; then
+        eerror "redis-server not found at /usr/bin/redis-server"
+        eerror "Install via: apk add redis"
+        return 1
+    fi
+
+    einfo "Cache node starting (Redis, config: ${REDIS_CONF})"
+}
+
+start_post() {
+    # Allow Redis to bind and accept connections
+    sleep 1
+
+    # Gather initial stats for health publish
+    MEM_USED="unknown"
+    CLIENTS="unknown"
+    if command -v redis-cli >/dev/null 2>&1; then
+        MEM_USED=$(redis-cli -s /run/redis/redis.sock info memory 2>/dev/null \
+                   | awk -F: '/^used_memory_human/ {gsub(/\r/,"",$2); print $2}' || echo "unknown")
+        CLIENTS=$(redis-cli -s /run/redis/redis.sock info clients 2>/dev/null \
+                  | awk -F: '/^connected_clients/ {gsub(/\r/,"",$2); print $2}' || echo "0")
+    fi
+
+    # Publish initial health
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish cache healthy \
+            "backend=redis" "memory=${MEM_USED}" "clients=${CLIENTS}" &
+    fi
+
+    # Start background health loop
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        start-stop-daemon --start --background \
+            --make-pidfile --pidfile /run/ntari-cache-health.pid \
+            --exec /usr/local/bin/ros2-node-health \
+            -- loop cache "${NTARI_CACHE_HEALTH_INTERVAL:-30}" redis-server \
+            >> /var/log/ntari/cache.log 2>&1 || true
+    fi
+
+    einfo "Cache node running (Redis on 127.0.0.1:6379 + /run/redis/redis.sock)"
+    einfo "Health publishing active on /ntari/cache/health"
+}
+
+stop_pre() {
+    einfo "Stopping cache node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish cache failed "reason=service_stopped" || true
+    fi
+
+    # Stop health loop
+    start-stop-daemon --stop --pidfile /run/ntari-cache-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-cache-health.pid
+}
+
+stop() {
+    # Use redis-cli SHUTDOWN NOSAVE for a clean stop that flushes no data
+    # (since we are a pure cache by default — no persistence)
+    if command -v redis-cli >/dev/null 2>&1; then
+        redis-cli -s /run/redis/redis.sock shutdown nosave >/dev/null 2>&1 || true
+    fi
+    # start-stop-daemon fallback if redis-cli unavailable
+    start-stop-daemon --stop --pidfile "${pidfile}" --retry TERM/5/KILL/1 \
+        >/dev/null 2>&1 || true
+    eend 0
+}

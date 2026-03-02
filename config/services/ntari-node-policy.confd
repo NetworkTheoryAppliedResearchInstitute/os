@@ -1,0 +1,17 @@
+# NTARI OS — Node Policy Service Configuration
+# /etc/conf.d/ntari-node-policy
+#
+# Override these values in /etc/conf.d/ntari-node-policy on the deployed node.
+
+# Port for the policy HTTP server (Caddy reverse-proxies /node/policy/ here)
+NTARI_POLICY_PORT=8091
+
+# Path to the Caddyfile (patched at start_pre to add /node/policy route)
+NTARI_POLICY_CADDY_CONF=/etc/ntari/Caddyfile
+
+# Health publish interval in seconds
+NTARI_POLICY_HEALTH_INTERVAL=30
+
+# Override capability and policy file paths if needed
+# NTARI_HW_CAPABILITIES=/ntari/node/capabilities
+# NTARI_NODE_POLICY=/ntari/node/policy

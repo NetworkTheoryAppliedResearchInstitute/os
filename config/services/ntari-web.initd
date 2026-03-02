@@ -1,0 +1,188 @@
+#!/sbin/openrc-run
+# NTARI OS — Web Node (ntari_web_node)
+# Phase 7: Services Layer
+#
+# Wraps Caddy as a ROS2 lifecycle node.
+# Caddy serves the NTARI globe interface and any other web content.
+# Publishes /ntari/web/health and /ntari/web/status to the DDS graph.
+#
+# Default binding: http://localhost:8080 (configurable via ntari-web.confd)
+# When a domain name is configured: Caddy handles automatic HTTPS via ACME.
+#
+# The globe interface (Phase 8) is served from /var/lib/ntari/interface/.
+# Accessible at http://ntari.local on the local cooperative network via mDNS.
+#
+# Boot dependencies:
+#   - Requires ros2-domain (DDS graph must be up before health publishing)
+#   - Requires net
+#   - After ntari-dns (DNS should resolve before Caddy tries ACME/HTTPS)
+#   - After ntari-cache (Redis session backend should be up before web frontend)
+
+name="ntari-web"
+description="NTARI Web Node — Caddy + ROS2 health publishing"
+
+CADDY_CONF="${NTARI_WEB_CADDY_CONF:-/etc/ntari/Caddyfile}"
+command="/usr/sbin/caddy"
+command_args="run --config ${CADDY_CONF}"
+command_background="yes"
+pidfile="/run/ntari-web.pid"
+command_user="root"
+
+output_log="/var/log/ntari/web.log"
+error_log="/var/log/ntari/web.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+# Caddy requires XDG_DATA_HOME or HOME to be set for its data directory.
+# On headless nodes root's home is /root.
+export HOME="/root"
+export XDG_DATA_HOME="/var/lib/ntari/caddy"
+export XDG_CONFIG_HOME="/etc/ntari"
+
+depend() {
+    need net ros2-domain
+    after ntari-dns ntari-ntp ntari-cache
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+    mkdir -p /var/lib/ntari/interface
+    mkdir -p /var/lib/ntari/caddy
+
+    # Write a default Caddyfile if one doesn't exist
+    if [ ! -f "${CADDY_CONF}" ]; then
+        mkdir -p "$(dirname "${CADDY_CONF}")"
+        einfo "Writing default Caddyfile: ${CADDY_CONF}"
+        cat > "${CADDY_CONF}" <<'CADDY_EOF'
+# NTARI OS — Caddy configuration
+# /etc/ntari/Caddyfile
+#
+# Default: serve the NTARI globe interface on port 8080 over HTTP.
+# For HTTPS with a real domain, replace ":8080" with "yourdomain.example".
+# Caddy will automatically obtain a TLS certificate via Let's Encrypt.
+#
+# See: https://caddyserver.com/docs/caddyfile
+
+:8080 {
+    # Serve the globe interface from the NTARI interface directory
+    root * /var/lib/ntari/interface
+
+    # Enable directory listing for development (disable in production)
+    # browse
+
+    # Serve static files
+    file_server
+
+    # Rewrite unmatched paths to index.html for single-page app behaviour
+    try_files {path} /index.html
+
+    # Log to NTARI log directory
+    log {
+        output file /var/log/ntari/web-access.log
+        format console
+    }
+
+    # Reverse proxy the WebSocket bridge (Phase 8: Globe bridge node)
+    # Uncomment when ntari_globe_bridge is running on :9090
+    # handle /ws/* {
+    #     reverse_proxy localhost:9090
+    # }
+}
+CADDY_EOF
+        chmod 640 "${CADDY_CONF}"
+    fi
+
+    # Install a placeholder index.html if the interface dir is empty
+    if [ ! -f /var/lib/ntari/interface/index.html ]; then
+        einfo "Installing placeholder globe interface page"
+        cat > /var/lib/ntari/interface/index.html <<'HTML_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTARI OS — Node Interface</title>
+<style>
+  body { background: #0a0a0f; color: #7ecfff; font-family: monospace;
+         display: flex; align-items: center; justify-content: center;
+         height: 100vh; margin: 0; flex-direction: column; gap: 1rem; }
+  h1   { font-size: 1.4rem; letter-spacing: 0.15em; }
+  p    { color: #4a7f9f; font-size: 0.85rem; }
+  code { color: #3fe; }
+</style>
+</head>
+<body>
+<h1>NTARI OS</h1>
+<p>Globe interface not yet deployed.</p>
+<p>Deploy via: <code>ros2 topic echo /ntari/web/status</code></p>
+<p>Phase 8 will connect this page to the live DDS graph.</p>
+</body>
+</html>
+HTML_EOF
+    fi
+
+    # Verify Caddy binary
+    if [ ! -x /usr/sbin/caddy ]; then
+        eerror "Caddy not found at /usr/sbin/caddy"
+        eerror "Install via: apk add caddy"
+        return 1
+    fi
+
+    # Validate Caddyfile syntax
+    if ! caddy validate --config "${CADDY_CONF}" >/dev/null 2>&1; then
+        eerror "Caddyfile validation failed: ${CADDY_CONF}"
+        caddy validate --config "${CADDY_CONF}"
+        return 1
+    fi
+
+    einfo "Web node starting (Caddy, config: ${CADDY_CONF})"
+}
+
+start_post() {
+    sleep 1
+
+    # Publish initial health to DDS graph
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        WEB_PORT=$(grep -E '^\s*:[0-9]+' "${CADDY_CONF}" 2>/dev/null | head -1 | tr -d ' :{' || echo "8080")
+        ros2-node-health publish web healthy "backend=caddy" "port=${WEB_PORT}" &
+    fi
+
+    # Start background health publishing loop
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        start-stop-daemon --start --background \
+            --make-pidfile --pidfile /run/ntari-web-health.pid \
+            --exec /usr/local/bin/ros2-node-health \
+            -- loop web "${NTARI_WEB_HEALTH_INTERVAL:-30}" caddy \
+            >> /var/log/ntari/web.log 2>&1 || true
+    fi
+
+    einfo "Web node running on port 8080 — accessible at http://ntari.local"
+    einfo "Health publishing active on /ntari/web/health"
+}
+
+stop_pre() {
+    einfo "Stopping web node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish web failed "reason=service_stopped" || true
+    fi
+
+    # Stop health loop
+    start-stop-daemon --stop --pidfile /run/ntari-web-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-web-health.pid
+}

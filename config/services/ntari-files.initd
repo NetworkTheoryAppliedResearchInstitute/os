@@ -1,0 +1,220 @@
+#!/sbin/openrc-run
+# NTARI OS — Files Node (ntari_files_node)
+# Phase 7: Services Layer — High Priority Tier
+#
+# Wraps Samba (SMB) as a ROS2 lifecycle node.
+# Provides cooperative-wide file sharing with DDS graph visibility.
+# NFS support is available as an optional secondary backend.
+#
+# Samba is chosen as primary because:
+#   - Cross-platform (Windows, macOS, Linux all speak SMB natively)
+#   - Well-understood by cooperative members managing mixed hardware
+#   - Integrates with ntari-identity (Kerberos auth via winbindd when FreeIPA used)
+#   - AD DC mode available for full cooperative directory services
+#
+# Publishes:
+#   /ntari/files/health         — std_msgs/String : healthy | degraded | failed
+#   /ntari/files/status         — std_msgs/String : JSON with share count, connection count
+#   /ntari/files/active_shares  — std_msgs/String : JSON array of share names + client counts
+#
+# Boot dependencies:
+#   - Requires ros2-domain, net
+#   - After ntari-ntp (SMB auth is time-sensitive; Kerberos requires < 5 min skew)
+#   - After ntari-identity (for Kerberos/LDAP member authentication)
+#   - After ntari-dns (Samba does NetBIOS/WINS name resolution via DNS)
+
+name="ntari-files"
+description="NTARI Files Node — Samba SMB + ROS2 health publishing"
+
+SAMBA_CONF="${NTARI_FILES_SAMBA_CONF:-/etc/ntari/smb.conf}"
+
+command="/usr/sbin/smbd"
+command_args="--foreground --no-process-group --configfile=${SAMBA_CONF}"
+command_background="yes"
+pidfile="/run/samba/smbd.pid"
+command_user="root"
+
+output_log="/var/log/ntari/files.log"
+error_log="/var/log/ntari/files.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    after ntari-ntp ntari-identity ntari-dns
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+    mkdir -p /run/samba
+    mkdir -p /var/lib/ntari/shares
+
+    # Write a default smb.conf if none exists
+    if [ ! -f "${SAMBA_CONF}" ]; then
+        mkdir -p "$(dirname "${SAMBA_CONF}")"
+        HOSTNAME=$(hostname 2>/dev/null || echo "ntari-node")
+        einfo "Writing default smb.conf: ${SAMBA_CONF}"
+        cat > "${SAMBA_CONF}" <<SMBCONF_EOF
+# NTARI OS — Samba Configuration
+# /etc/ntari/smb.conf
+#
+# Default: standalone file server with a single shared volume.
+# For Kerberos/FreeIPA integration, set security = ADS and configure
+# ntari-identity (freeipa backend) first.
+#
+# See: smb.conf(5) for full reference.
+
+[global]
+    workgroup = NTARI
+    server string = NTARI Cooperative File Server (%h)
+    netbios name = ${HOSTNAME}
+    security = user
+    passdb backend = tdbsam
+
+    # Bind to loopback + local network (not WireGuard federation by default)
+    # Change to "interfaces = eth0 wg-ntari" to enable federation file sharing
+    interfaces = lo eth0
+    bind interfaces only = yes
+
+    # Logging
+    log file = /var/log/ntari/samba-%m.log
+    max log size = 1000
+    logging = file
+
+    # Protocol range — SMB2 minimum for security
+    server min protocol = SMB2
+    server max protocol = SMB3
+
+    # mDNS registration (announces shares to macOS/Linux via Avahi)
+    # Requires: apk add avahi
+    # mdns name = mdns
+
+    # Disable printing services (not needed on a cooperative infrastructure node)
+    load printers = no
+    printing = bsd
+    printcap name = /dev/null
+    disable spoolss = yes
+
+[cooperative]
+    comment = NTARI Cooperative Shared Storage
+    path = /var/lib/ntari/shares
+    browseable = yes
+    writable = yes
+    # Allow all authenticated users to read/write
+    valid users = @ntari
+    create mask = 0664
+    directory mask = 0775
+    # Audit connections to DDS (Phase 8: file activity on globe)
+    # full_audit:success = connect disconnect opendir mkdir rmdir open close rename
+    # full_audit:failure = connect
+    # full_audit:prefix = %u|%I|%m|%S
+    # vfs objects = full_audit
+
+[homes]
+    comment = Home Directories
+    browseable = no
+    writable = yes
+    valid users = %S
+    create mask = 0600
+    directory mask = 0700
+SMBCONF_EOF
+        chmod 640 "${SAMBA_CONF}"
+
+        # Create default 'ntari' group for share access
+        if ! getent group ntari >/dev/null 2>&1; then
+            addgroup ntari 2>/dev/null || true
+        fi
+
+        ewarn "Default smb.conf written."
+        ewarn "Create Samba users with: smbpasswd -a <username>"
+        ewarn "Add users to share group: adduser <username> ntari"
+    fi
+
+    # Verify Samba binary
+    if [ ! -x /usr/sbin/smbd ]; then
+        eerror "smbd not found at /usr/sbin/smbd"
+        eerror "Install via: apk add samba"
+        return 1
+    fi
+
+    # Test smb.conf syntax
+    if ! testparm -s "${SAMBA_CONF}" >/dev/null 2>&1; then
+        eerror "smb.conf syntax error: ${SAMBA_CONF}"
+        testparm "${SAMBA_CONF}"
+        return 1
+    fi
+
+    einfo "Files node starting (Samba smbd, config: ${SAMBA_CONF})"
+}
+
+start_post() {
+    sleep 1
+
+    # Also start nmbd (NetBIOS name service) for Windows/legacy compatibility
+    if [ -x /usr/sbin/nmbd ]; then
+        start-stop-daemon --start --background \
+            --make-pidfile --pidfile /run/samba/nmbd.pid \
+            --exec /usr/sbin/nmbd \
+            -- --foreground --no-process-group --configfile="${SAMBA_CONF}" \
+            >> /var/log/ntari/files.log 2>&1 || true
+    fi
+
+    # Count configured shares
+    SHARE_COUNT=0
+    if command -v testparm >/dev/null 2>&1; then
+        SHARE_COUNT=$(testparm -s "${SAMBA_CONF}" 2>/dev/null \
+                      | grep -c '^\[' || echo "0")
+        # Subtract 1 for [global]
+        SHARE_COUNT=$((SHARE_COUNT - 1))
+        [ "${SHARE_COUNT}" -lt 0 ] && SHARE_COUNT=0
+    fi
+
+    # Publish initial health
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish files healthy \
+            "backend=samba" "shares=${SHARE_COUNT}" &
+    fi
+
+    # Start background health loop
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        start-stop-daemon --start --background \
+            --make-pidfile --pidfile /run/ntari-files-health.pid \
+            --exec /usr/local/bin/ros2-node-health \
+            -- loop files "${NTARI_FILES_HEALTH_INTERVAL:-30}" smbd \
+            >> /var/log/ntari/files.log 2>&1 || true
+    fi
+
+    einfo "Files node running — SMB shares available on cooperative network"
+    einfo "Health publishing active on /ntari/files/health"
+}
+
+stop_pre() {
+    einfo "Stopping files node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish files failed "reason=service_stopped" || true
+    fi
+
+    # Stop nmbd
+    start-stop-daemon --stop --pidfile /run/samba/nmbd.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+
+    # Stop health loop
+    start-stop-daemon --stop --pidfile /run/ntari-files-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-files-health.pid
+}

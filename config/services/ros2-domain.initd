@@ -1,0 +1,95 @@
+#!/sbin/openrc-run
+# NTARI OS — ROS2 DDS Domain Service
+#
+# Starts the ROS2 daemon (graph cache + discovery) and ensures the
+# Cyclone DDS multicast domain 0 is active before any other service.
+#
+# Boot priority: after net, before ALL other NTARI services.
+# This is the architectural inversion in practice — the network graph
+# comes up before local services; services publish into it at startup.
+
+name="ros2-domain"
+description="ROS2 DDS Domain 0 — network graph foundation"
+
+# One-shot service: 'ros2 daemon start' launches the background daemon
+# and exits immediately. We use a custom start()/stop() rather than
+# OpenRC command supervision (which would mark it as crashed when the
+# one-shot command exits normally).
+
+# Log directory
+output_log="/var/log/ntari/ros2-domain.log"
+error_log="/var/log/ntari/ros2-domain.log"
+
+# Source the ROS2 environment before exec.
+# OpenRC does not source /etc/profile.d, so we set the required
+# variables explicitly here rather than relying on the profile.
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+# Cyclone DDS: point at our config if present
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    # Need networking before DDS multicast discovery can function.
+    need net
+    # Must start before all NTARI service nodes.
+    before ntari-dns ntari-dhcp ntari-ntp ntari-web ntari-cache
+    before ntari-vpn ntari-identity ntari-files
+    before soholink
+    # After chrony — clocks should be sane before DDS QoS timestamps are used.
+    # Use 'after' not 'need' so the domain still starts if chrony is absent.
+    after chronyd
+}
+
+start_pre() {
+    # Create log dir (may not exist on first boot)
+    mkdir -p /var/log/ntari
+
+    # Verify ROS2 is installed
+    if [ ! -f "/usr/ros/jazzy/bin/ros2" ]; then
+        eerror "ROS2 Jazzy not found at /usr/ros/jazzy"
+        eerror "Install via: apk add ros-jazzy-ros-base"
+        return 1
+    fi
+
+    # Verify Cyclone DDS RMW is available
+    if [ ! -f "/usr/ros/jazzy/lib/librmw_cyclonedds_cpp.so" ] && \
+       [ ! -f "/usr/ros/jazzy/lib/x86_64-linux-gnu/librmw_cyclonedds_cpp.so" ]; then
+        ewarn "rmw_cyclonedds_cpp not found — DDS discovery may fail"
+        ewarn "Install via: apk add ros-jazzy-rmw-cyclonedds-cpp"
+    fi
+
+    einfo "Starting ROS2 DDS domain ${ROS_DOMAIN_ID} (Cyclone DDS)"
+}
+
+start() {
+    # One-shot: 'ros2 daemon start' launches the background daemon and exits.
+    # We call it directly and report success based on exit code + status check.
+    ebegin "Starting ros2-domain"
+    /usr/ros/jazzy/bin/ros2 daemon start >/dev/null 2>&1
+    local rc=$?
+    sleep 1
+    # Verify daemon is responding even if start returned non-zero (already running = ok)
+    if /usr/ros/jazzy/bin/ros2 daemon status >/dev/null 2>&1; then
+        einfo "ROS2 daemon active — DDS domain ${ROS_DOMAIN_ID} ready"
+        eend 0
+    else
+        eend $rc "ROS2 daemon failed to start"
+    fi
+}
+
+stop() {
+    ebegin "Stopping ros2-domain"
+    /usr/ros/jazzy/bin/ros2 daemon stop >/dev/null 2>&1 || true
+    eend 0
+}

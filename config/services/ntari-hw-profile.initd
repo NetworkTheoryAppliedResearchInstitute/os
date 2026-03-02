@@ -1,0 +1,99 @@
+#!/sbin/openrc-run
+# NTARI OS — Hardware Profile Node (ntari_hw_profile_node)
+# Phase 10: Hardware Config
+#
+# One-shot service: runs ntari-hw-profile.sh at boot, writes hardware
+# capabilities to /ntari/node/capabilities, publishes to DDS graph.
+#
+# Does NOT run a persistent daemon — hardware profile is stable across
+# a single boot session. Restart the service if hardware changes.
+#
+# Publishes:
+#   /ntari/node/capabilities  — std_msgs/String : JSON capabilities document
+#   /ntari/hw/health          — std_msgs/String : healthy | failed
+
+name="ntari-hw-profile"
+description="NTARI Hardware Profile Node — detect capabilities + publish to DDS"
+
+# One-shot: custom start()/stop(), no command supervision.
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain
+    after ntari-ntp ntari-dns ntari-identity
+    before ntari-node-policy ntari-web
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /ntari/node /var/lib/ntari/identity
+
+    if [ ! -x /usr/local/bin/ntari-hw-profile.sh ]; then
+        eerror "ntari-hw-profile.sh not found at /usr/local/bin/ntari-hw-profile.sh"
+        return 1
+    fi
+}
+
+start() {
+    ebegin "Detecting hardware capabilities"
+
+    # Run detection script
+    /usr/local/bin/ntari-hw-profile.sh >> /var/log/ntari/hw-profile.log 2>&1
+    local rc=$?
+
+    if [ ${rc} -eq 0 ] && [ -s /ntari/node/capabilities ]; then
+        einfo "Hardware profile written to /ntari/node/capabilities"
+
+        # Publish capabilities to DDS graph (best-effort; DDS may not be ready yet)
+        if command -v ros2 >/dev/null 2>&1; then
+            # Single-quote the JSON for ros2 topic pub; escape any single-quotes inside
+            local CAPS
+            CAPS=$(cat /ntari/node/capabilities | tr '\n' ' ' | sed "s/'/'\\\\''/g")
+            ros2 topic pub --once /ntari/node/capabilities \
+                std_msgs/msg/String "{data: '${CAPS}'}" \
+                >/dev/null 2>&1 && einfo "Capabilities published to /ntari/node/capabilities" \
+                || ewarn "DDS publish failed — capabilities on disk, not in graph yet"
+        fi
+
+        eend 0
+    else
+        eend ${rc} "Hardware detection failed — see /var/log/ntari/hw-profile.log"
+    fi
+}
+
+start_post() {
+    # One-shot: publish health once; no persistent loop needed (no daemon to monitor)
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        local STATE="failed"
+        [ -s /ntari/node/capabilities ] && STATE="healthy"
+        ros2-node-health publish hw "${STATE}" \
+            "source=/ntari/node/capabilities" \
+            >> /var/log/ntari/hw-profile.log 2>&1 &
+    fi
+}
+
+stop() {
+    # One-shot: nothing to kill. Capabilities file persists on disk.
+    eend 0
+}
+
+stop_pre() {
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish hw failed "reason=service_stopped" \
+            >> /var/log/ntari/hw-profile.log 2>&1 || true
+    fi
+}
