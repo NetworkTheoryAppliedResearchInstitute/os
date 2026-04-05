@@ -37,10 +37,17 @@ pipelines, network graph UIs, behavioral scoring, or other SoHoLINK-tier service
 - `config/services/ros2-domain.initd` — ROS2 daemon; boots before ALL ntari-* services
 - `config/services/ntari-modloop.initd` — Sysinit service; fixes Alpine modloop nesting before networking
 - `config/services/ntari-*.initd` — One per service node; all follow the same pattern (see below)
+  - Each `ntari-*.initd` has a companion `*.confd` for env var overrides (e.g. `ROS_DOMAIN_ID`, interface names) — standard Alpine OpenRC companion files; not listed individually
+  - `config/services/chrony.conf` — Chrony config for ntari-ntp; `daemonize no` (OpenRC manages process)
+  - `config/network/interfaces` — standard Alpine ifupdown config; eth0 DHCP by default
 - `packages/cyclonedds/APKBUILD` — Cyclone DDS with musl thread stack patch
 - `packages/cyclonedds/0001-musl-thread-stack-size.patch` — `pthread_attr_setstacksize(4MB)` fix
 - `docs/FEDERATION.md` — Federation setup guide and governance
 - **Globe UI + WebSocket bridge** — moved to SoHoLINK (`ui/globe-interface/`). NTARI OS exposes the ROS2 DDS graph; visualisation is an application concern.
+
+### Utilities
+- `scripts/ntari-admin.sh` — interactive TUI admin menu; baked into ISO overlay; options: restart services, add users, tail logs, apk upgrade, reboot/poweroff
+- `scripts/check-updates.sh` — APK update checker; runs max once per 24h; caches result in `/var/cache/ntari/`; logs outdated package count via `logger`; no NTARI-specific dependencies
 
 ## Build & Syntax Check
 - `sh -n <file>` — POSIX syntax check; works on Windows via Git Bash; validates both `.sh` and `.initd` files
@@ -119,6 +126,8 @@ net → ros2-domain → ntari-ntp → ntari-dhcp → ntari-dns → ntari-cache
 - `ntari-federation` installs to ISO but is NOT auto-enabled in runlevel; requires WireGuard peer config first
 - alpine-ros APK key: `alpine-ros@github.com-5fad27d9.rsa.pub` at `https://packages.alpine-ros.org/`
 - Cyclone DDS musl patch target: `src/core/os/src/posix/os_thread_posix.c`, function `create_thread_with_properties()`
+- Globe source is tracked at `ui/globe-interface/index.html` — `build-iso.sh` copies from there (`GLOBE_SRC` variable, Phase 8 block). Do not edit the copy in `build-output/`; it is gitignored and will be overwritten on next build.
+- `scripts/ntari-cli.sh` was a duplicate of `core/ntari-cli.sh` — removed in commit `d361c74`. Canonical copy is `core/ntari-cli.sh`.
 
 ## Phase 0 Validation Findings (2026-02-28)
 - **ROS2 install path**: Alpine-native packages install to `/usr/ros/jazzy/` NOT `/opt/ros/jazzy/`; Python 3.12 NOT 3.11
