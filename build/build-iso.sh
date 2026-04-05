@@ -280,7 +280,7 @@ profile_ntari_ros2() {
         kea
         wireguard-tools
         samba
-        openldap-server
+        openldap
         pciutils
         iptables
         iproute2
