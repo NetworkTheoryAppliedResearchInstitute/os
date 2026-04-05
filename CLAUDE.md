@@ -27,6 +27,7 @@ pipelines, network graph UIs, behavioral scoring, or other SoHoLINK-tier service
 ## Key Files
 - `build/build-iso.sh` — Main ISO builder (lines ~130–270: mkimage profile heredoc; ~280–700: overlay logic)
 - `build/Dockerfile` — Alpine 3.23 build container (must run inside Alpine, not Windows)
+- `build/Makefile` — make targets: `iso` (default), `docker-build`, `docker-run`, `vbox-test`, `clean`, `clean-all`; pass `EDITION=ros2` for ROS2 build; Alpine 3.23, server edition default
 - `scripts/ntari-init.sh` — First-boot init; edition-aware (server vs ros2)
 - `scripts/setup-ros2.sh` — ROS2 APK repo trust + install
 - `scripts/ros2-node-health.sh` — Shared health publisher used by all Phase 7+ nodes

@@ -18,7 +18,7 @@ DOCKER_RUN     := docker run --rm --privileged \
                     -w /workspace \
                     $(DOCKER_IMAGE)
 
-.PHONY: all iso vm test clean clean-all docker-build docker-run vbox-test vbox-clean help
+.PHONY: all iso test clean clean-all docker-build docker-run vbox-test vbox-clean help
 
 # ─────────────────────────────────────────────────────────
 # Default target
@@ -53,22 +53,12 @@ iso: docker-build
 	@echo "✓ ISO build complete: $(BUILD_DIR)/$(ISO_NAME)"
 
 # ─────────────────────────────────────────────────────────
-# Build VM image (QCOW2 + VMDK via Packer)
-# ─────────────────────────────────────────────────────────
-
-vm: iso
-	@echo "→ Building VM image (Packer)..."
-	$(PROJECT_DIR)/vm/build-vm.sh "$(BUILD_DIR)/$(ISO_NAME)"
-	@echo "✓ VM images ready in $(BUILD_DIR)/"
-
-# ─────────────────────────────────────────────────────────
 # Run integration tests
 # ─────────────────────────────────────────────────────────
 
 test:
-	@echo "→ Running NTARI OS integration tests..."
-	$(PROJECT_DIR)/tests/run-tests.sh
-	@echo "✓ Tests complete"
+	@echo "Run: sh tests/integration/test-ros2-phase6.sh"
+	@echo "Run: sh tests/ixp/test_bgp_node.sh"
 
 # ─────────────────────────────────────────────────────────
 # Interactive Docker shell (for debugging)
@@ -142,8 +132,7 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  make iso          Build bootable ISO (default)"
-	@echo "  make vm           Build VM images (QCOW2 + VMDK)"
-	@echo "  make test         Run integration tests"
+	@echo "  make test         List available integration tests"
 	@echo "  make docker-build Build the Docker build environment"
 	@echo "  make docker-run   Open interactive build shell"
 	@echo "  make vbox-test    Create + launch VirtualBox test VM"
@@ -159,6 +148,6 @@ help:
 	@echo "Output: $(BUILD_DIR)/$(ISO_NAME)"
 	@echo ""
 	@echo "Requirements:"
-	@echo "  - Docker Desktop (for iso/vm targets)"
+	@echo "  - Docker Desktop (for iso target)"
 	@echo "  - VirtualBox 7.2.6 (for vbox-test target)"
 	@echo ""
