@@ -71,7 +71,7 @@ start_pre() {
     # Verify slapd binary
     if [ ! -x /usr/sbin/slapd ]; then
         eerror "slapd not found at /usr/sbin/slapd"
-        eerror "Install via: apk add openldap-server"
+        eerror "Install via: apk add openldap"
         return 1
     fi
 
