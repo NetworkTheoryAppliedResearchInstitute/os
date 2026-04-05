@@ -146,7 +146,19 @@
       "Bash(git remote add origin https://github.com/NetworkTheoryAppliedResearchInstitute/os.git)",
       "Bash(git add .)",
       "Bash(git rm --cached Leveson-Based-Trade-Assessment-Scale)",
-      "Bash(git submodule add https://github.com/NTARI-RAND/Leveson-Based-Trade-Assessment-Scale.git Leveson-Based-Trade-Assessment-Scale)"
+      "Bash(git submodule add https://github.com/NTARI-RAND/Leveson-Based-Trade-Assessment-Scale.git Leveson-Based-Trade-Assessment-Scale)",
+      "Bash(git commit:*)",
+      "Bash(git branch -M main)",
+      "Bash(git push --force origin main)",
+      "Read(//c/Users/**)",
+      "Bash(for f:*)",
+      "Bash(do sh:*)",
+      "Bash(find packages/ixp-* ui/globe-interface config/services/ntari-ixp-* config/services/ixp.conf tests/ixp docs/IXP_*.md -type f)",
+      "Bash(find '/c/Users/Jodson Graves/Documents/NTARI OS' -name *globe*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/Jodson Graves/Documents/NTARI OS/**)",
+      "Bash(python3 -c \"import shutil, os; shutil.rmtree\\(os.path.join\\(os.getcwd\\(\\), '';C''\\), ignore_errors=True\\); print\\(''done''\\)\")",
+      "Bash(for dir:*)"
     ]
   }
 }
