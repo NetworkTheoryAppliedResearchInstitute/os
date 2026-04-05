@@ -15,9 +15,8 @@ show_menu() {
 3. User Management
 4. Logs Viewer
 5. System Update
-6. Health Check
-7. Reboot
-8. Shutdown
+6. Reboot
+7. Shutdown
 0. Exit
 
 Enter choice:
@@ -48,9 +47,8 @@ while true; do
 		3) adduser ;;
 		4) tail -f /var/log/messages ;;
 		5) apk update && apk upgrade ; read -p "Press Enter..." ;;
-		6) /usr/local/bin/health-check.sh ; read -p "Press Enter..." ;;
-		7) reboot ;;
-		8) poweroff ;;
+		6) reboot ;;
+		7) poweroff ;;
 		0) exit 0 ;;
 		*) echo "Invalid choice" ; sleep 1 ;;
 	esac
