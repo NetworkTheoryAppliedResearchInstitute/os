@@ -1,0 +1,5 @@
+# NTARI OS — IXP Registry Node Configuration
+# /etc/conf.d/ntari-ixp-registry
+
+NTARI_IXP_CONF=/etc/ntari/ixp.conf
+NTARI_IXP_REGISTRY_HEALTH_INTERVAL=60

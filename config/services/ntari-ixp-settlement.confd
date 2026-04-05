@@ -1,0 +1,5 @@
+# NTARI OS — IXP Settlement Node Configuration
+# /etc/conf.d/ntari-ixp-settlement
+
+NTARI_IXP_CONF=/etc/ntari/ixp.conf
+NTARI_IXP_SETTLEMENT_HEALTH_INTERVAL=60

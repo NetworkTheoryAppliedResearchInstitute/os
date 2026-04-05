@@ -1,0 +1,61 @@
+# Maintainer: NTARI <contact@ntari.org>
+pkgname=ixp-registry
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="NTARI OS IXP Member Registry — member DB, PeeringDB sync, IRR filter generation"
+url="https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os"
+arch="x86_64 aarch64"
+license="AGPL-3.0"
+depends="
+	python3
+	py3-rclpy
+	sqlite
+	bgpq4
+	curl
+"
+source="
+	ros2_registry_node.py
+	member_db.py
+	peeringdb_client.py
+	irr_filter_gen.py
+	provisioning_wizard.py
+	templates/member_welcome.txt
+	templates/peering_policy.txt.template
+"
+builddir="$srcdir"
+
+build() {
+	: # no compiled artifacts
+}
+
+check() {
+	for f in ros2_registry_node.py member_db.py peeringdb_client.py \
+	          irr_filter_gen.py provisioning_wizard.py; do
+		python3 -m py_compile "$srcdir/$f"
+	done
+}
+
+package() {
+	install -Dm755 "$srcdir/ros2_registry_node.py" \
+		"$pkgdir/usr/local/bin/ixp-registry-node.py"
+	install -Dm755 "$srcdir/provisioning_wizard.py" \
+		"$pkgdir/usr/local/bin/ixp-registry-provision"
+
+	install -Dm644 "$srcdir/member_db.py" \
+		"$pkgdir/usr/lib/ntari/ixp-registry/member_db.py"
+	install -Dm644 "$srcdir/peeringdb_client.py" \
+		"$pkgdir/usr/lib/ntari/ixp-registry/peeringdb_client.py"
+	install -Dm644 "$srcdir/irr_filter_gen.py" \
+		"$pkgdir/usr/lib/ntari/ixp-registry/irr_filter_gen.py"
+
+	install -Dm644 "$srcdir/templates/member_welcome.txt" \
+		"$pkgdir/usr/share/ntari/ixp-registry/templates/member_welcome.txt"
+	install -Dm644 "$srcdir/templates/peering_policy.txt.template" \
+		"$pkgdir/usr/share/ntari/ixp-registry/templates/peering_policy.txt.template"
+
+	install -dm755 "$pkgdir/var/lib/ntari/ixp"
+	install -dm755 "$pkgdir/etc/frr/prefix-lists"
+
+	install -Dm644 "$srcdir/../../../LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

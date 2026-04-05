@@ -1,0 +1,46 @@
+# Maintainer: NTARI <contact@ntari.org>
+pkgname=ixp-settlement
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="NTARI OS IXP Lightning-Settled Paid Peering — optional SoHoLINK integration"
+url="https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os"
+arch="x86_64 aarch64"
+license="AGPL-3.0"
+depends="
+	python3
+	py3-rclpy
+	sqlite
+"
+source="
+	ros2_settlement_node.py
+	traffic_meter.py
+	lightning_settler.py
+	settlement.conf.template
+"
+builddir="$srcdir"
+
+build() {
+	: # no compiled artifacts
+}
+
+check() {
+	for f in ros2_settlement_node.py traffic_meter.py lightning_settler.py; do
+		python3 -m py_compile "$srcdir/$f"
+	done
+}
+
+package() {
+	install -Dm755 "$srcdir/ros2_settlement_node.py" \
+		"$pkgdir/usr/local/bin/ixp-settlement-node.py"
+	install -Dm644 "$srcdir/traffic_meter.py" \
+		"$pkgdir/usr/lib/ntari/ixp-settlement/traffic_meter.py"
+	install -Dm644 "$srcdir/lightning_settler.py" \
+		"$pkgdir/usr/lib/ntari/ixp-settlement/lightning_settler.py"
+	install -Dm644 "$srcdir/settlement.conf.template" \
+		"$pkgdir/usr/share/ntari/ixp-settlement/settlement.conf.template"
+
+	install -dm755 "$pkgdir/var/lib/ntari/ixp"
+
+	install -Dm644 "$srcdir/../../../LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

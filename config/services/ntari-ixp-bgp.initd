@@ -1,0 +1,135 @@
+#!/sbin/openrc-run
+# NTARI OS — IXP BGP Route Server Node (ixp_bgp_node)
+# Phase 14: IXP BGP Route Server
+#
+# Runs FRRouting as a ROS2 lifecycle node so the BGP route server
+# appears in the DDS computation graph and is visible on the globe.
+#
+# NOT auto-enabled. Enable after configuring /etc/ntari/ixp.conf:
+#   rc-update add ntari-ixp-bgp default
+#   rc-service ntari-ixp-bgp start
+#
+# Requires: ixp.conf [ixp] enabled = true, router_asn set
+#
+# Publishes:
+#   /ixp/bgp/peers        — JSON list of active BGP sessions
+#   /ixp/bgp/prefix_count — total prefixes in routing table
+#   /ixp/bgp/alerts       — session flaps, prefix limit violations
+#   /ixp/bgp/health       — healthy | degraded | failed
+
+name="ntari-ixp-bgp"
+description="NTARI IXP BGP Route Server — FRRouting + ROS2 lifecycle node"
+
+NTARI_IXP_CONF="${NTARI_IXP_CONF:-/etc/ntari/ixp.conf}"
+NTARI_IXP_BGP_PORT="${NTARI_IXP_BGP_PORT:-179}"
+NTARI_IXP_BGP_HEALTH_INTERVAL="${NTARI_IXP_BGP_HEALTH_INTERVAL:-30}"
+
+# Python lifecycle node (frrinit.sh is called from within the node)
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ixp-bgp-node.py"
+command_background="yes"
+pidfile="/run/ntari-ixp-bgp.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ixp-bgp.log"
+error_log="/var/log/ntari/ixp-bgp.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-wan
+    after ntari-ntp ntari-wan ntari-vpn
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /run/frr /etc/frr/prefix-lists
+
+    # Verify ixp.conf exists
+    if [ ! -f "${NTARI_IXP_CONF}" ]; then
+        eerror "IXP config not found: ${NTARI_IXP_CONF}"
+        eerror "Copy config/services/ixp.conf to /etc/ntari/ixp.conf and configure"
+        return 1
+    fi
+
+    # Check IXP is enabled
+    if ! grep -q "^enabled\s*=\s*true" "${NTARI_IXP_CONF}" 2>/dev/null; then
+        eerror "IXP not enabled in ${NTARI_IXP_CONF}"
+        eerror "Set [ixp] enabled = true and configure router_asn before starting"
+        return 1
+    fi
+
+    # Verify FRRouting is installed
+    if [ ! -x /usr/lib/frr/frrinit.sh ] && [ ! -x /usr/sbin/zebra ]; then
+        eerror "FRRouting not found — install with: apk add frr"
+        return 1
+    fi
+
+    # Verify bgpq4 is installed (for IRR filter generation)
+    if [ ! -x /usr/bin/bgpq4 ]; then
+        ewarn "bgpq4 not found — IRR prefix filter generation disabled"
+        ewarn "Install with: apk add bgpq4"
+    fi
+
+    # Verify lifecycle node script is present
+    if [ ! -f /usr/local/bin/ixp-bgp-node.py ]; then
+        eerror "ixp-bgp-node.py not found — install ixp-bgp package"
+        return 1
+    fi
+
+    einfo "IXP BGP route server starting (config: ${NTARI_IXP_CONF})"
+}
+
+start_post() {
+    sleep 3
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish bgp healthy \
+            "daemon=frr" "config=${NTARI_IXP_CONF}" &
+    fi
+
+    # Health loop — monitor the lifecycle node process
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-ixp-bgp-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ixp-bgp-node.py >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish bgp healthy \
+                   daemon=frr config=${NTARI_IXP_CONF} \
+                   2>/dev/null || true
+                 sleep ${NTARI_IXP_BGP_HEALTH_INTERVAL}
+               done" \
+        >> /var/log/ntari/ixp-bgp.log 2>&1 || true
+
+    einfo "BGP route server running"
+    einfo "vtysh -c 'show bgp summary'   — session status"
+    einfo "ros2 topic echo /ixp/bgp/peers  — DDS peer list"
+    einfo "Health publishing active on /ixp/bgp/health"
+}
+
+stop_pre() {
+    einfo "Stopping IXP BGP route server"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish bgp failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-ixp-bgp-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-ixp-bgp-health.pid
+
+    # Also stop FRR daemons if still running
+    /usr/lib/frr/frrinit.sh stop >/dev/null 2>&1 || true
+}

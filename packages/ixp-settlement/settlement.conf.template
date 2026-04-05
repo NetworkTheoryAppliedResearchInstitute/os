@@ -1,0 +1,22 @@
+# NTARI OS — IXP Settlement Configuration Template
+# Merged into /etc/ntari/ixp.conf [settlement] section.
+# Copy relevant values to ixp.conf before enabling.
+
+[settlement]
+# Master switch. Requires SoHoLINK running at soholink_api.
+enabled = false
+
+# Billing: charge per GB, asymmetric (heavier sender pays)
+rate_per_gb_sats = 10
+
+# Settlement interval in seconds
+settlement_interval_seconds = 3600
+
+# Minimum sats before generating a Lightning invoice (dust limit)
+dust_limit_sats = 1000
+
+# SoHoLINK API base URL
+soholink_api = http://localhost:8080
+
+# Audit ledger path
+ledger_path = /var/lib/ntari/ixp/settlement.db

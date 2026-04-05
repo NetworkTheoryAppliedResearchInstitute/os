@@ -1,0 +1,7 @@
+# NTARI OS — IXP Looking Glass Node Configuration
+# /etc/conf.d/ntari-ixp-lg
+
+NTARI_IXP_CONF=/etc/ntari/ixp.conf
+NTARI_IXP_LG_PORT=5000
+NTARI_IXP_LG_HEALTH_INTERVAL=30
+NTARI_IXP_LG_CADDY_CONF=/etc/ntari/Caddyfile

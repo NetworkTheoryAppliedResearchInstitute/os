@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NTARI IXP Looking Glass</title>
+  <style>
+    :root {
+      --bg:      #0a0a1e;
+      --surface: #111122;
+      --border:  #1a237e;
+      --accent:  #448aff;
+      --green:   #00e676;
+      --amber:   #ffab00;
+      --red:     #f44336;
+      --text:    #e0e0e0;
+      --muted:   #7986cb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 16px; color: var(--accent); letter-spacing: 1px; }
+    header .subtitle { font-size: 11px; color: var(--muted); }
+    .container { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h2 { font-size: 13px; color: var(--muted); text-transform: uppercase;
+               letter-spacing: 1px; margin-bottom: 14px; }
+    .query-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    select, input[type=text] {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    input[type=text] { flex: 1; min-width: 200px; }
+    button {
+      background: var(--border);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 18px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: var(--accent); }
+    .quick-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .quick-links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 12px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .quick-links a:hover { background: var(--surface); border-color: var(--accent); }
+    #result-area {
+      display: none;
+      margin-top: 16px;
+    }
+    #result-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    #result-body {
+      background: #000;
+      color: var(--green);
+      padding: 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: pre;
+      overflow-x: auto;
+      max-height: 60vh;
+      overflow-y: auto;
+      border: 1px solid #1b1b2e;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 6px;
+    }
+    .dot-green { background: var(--green); }
+    .dot-red   { background: var(--red); }
+    #status-bar {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    footer {
+      text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+      padding: 24px;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>NTARI IXP Looking Glass</h1>
+    <div class="subtitle">Read-only BGP visibility — rate limited 10 req/min per IP</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>BGP Query</h2>
+    <form id="lg-form" onsubmit="doQuery(event)">
+      <div class="query-row">
+        <select id="qtype" onchange="updatePlaceholder()">
+          <option value="route">Route lookup (prefix)</option>
+          <option value="peer">BGP peer (ASN)</option>
+          <option value="prefixes">Prefixes from AS (ASN)</option>
+        </select>
+        <input type="text" id="qval"
+               placeholder="e.g. 203.0.113.0/24"
+               autocomplete="off" spellcheck="false">
+        <button type="submit">Query</button>
+      </div>
+    </form>
+    <div class="quick-links">
+      <a href="#" onclick="fetchResult('/lg/summary','BGP Summary');return false">
+        BGP Summary
+      </a>
+    </div>
+    <div id="status-bar"></div>
+    <div id="result-area">
+      <div id="result-title"></div>
+      <pre id="result-body"></pre>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  NTARI OS IXP Extension &mdash; Phase 18 Looking Glass &mdash; AGPL-3.0
+</footer>
+
+<script>
+  function updatePlaceholder() {
+    const t = document.getElementById('qtype').value;
+    const ph = { route: 'e.g. 203.0.113.0/24', peer: 'e.g. 64512',
+                 prefixes: 'e.g. 64512' };
+    document.getElementById('qval').placeholder = ph[t] || '';
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function fetchResult(url, label) {
+    const bar = document.getElementById('status-bar');
+    const area = document.getElementById('result-area');
+    const title = document.getElementById('result-title');
+    const body = document.getElementById('result-body');
+
+    bar.innerHTML = '<span class="status-dot dot-green"></span>Querying...';
+    area.style.display = 'none';
+
+    try {
+      const resp = await fetch(url);
+      const text = await resp.text();
+      if (resp.status === 429) {
+        bar.innerHTML = '<span class="status-dot dot-red"></span>Rate limit exceeded — wait 60s';
+        return;
+      }
+      // Strip HTML tags from the response for plain pre display
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      const pre = doc.querySelector('pre');
+      const content = pre ? pre.textContent : text;
+
+      title.textContent = label;
+      body.textContent = content;
+      area.style.display = 'block';
+      bar.innerHTML = '<span class="status-dot dot-green"></span>Done';
+    } catch (e) {
+      bar.innerHTML = '<span class="status-dot dot-red"></span>Request failed: ' + escHtml(e.message);
+    }
+  }
+
+  function doQuery(e) {
+    e.preventDefault();
+    const type = document.getElementById('qtype').value;
+    const val = document.getElementById('qval').value.trim();
+    if (!val) return;
+    const url = '/lg/' + type + '/' + encodeURIComponent(val);
+    const labels = {
+      route: 'Route: ' + val,
+      peer: 'Peer AS' + val,
+      prefixes: 'Prefixes from AS' + val,
+    };
+    fetchResult(url, labels[type] || val);
+  }
+</script>
+</body>
+</html>

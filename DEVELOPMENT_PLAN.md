@@ -47,6 +47,12 @@ before Phase 10 development begins.
 | 11 | Contribution policy model + node role assignment | 📋 Planned |
 | 12 | Internet/broadcast configuration | 📋 Planned |
 | 13 | LBTAS-NIM behavioral security | 📋 Planned |
+| 14 | IXP BGP Route Server (FRRouting + ROS2 node) | 📋 Planned |
+| 15 | IXP Layer 2 Fabric Management | 📋 Planned |
+| 16 | Member Registry + PeeringDB Integration | 📋 Planned |
+| 17 | Globe Interface IXP Mode | 📋 Planned |
+| 18 | Looking Glass Service | 📋 Planned |
+| 19 | Lightning-Settled Paid Peering (optional) | 📋 Planned |
 
 ---
 

@@ -1,0 +1,114 @@
+#!/sbin/openrc-run
+# NTARI OS — IXP Fabric Node (ixp_fabric_node)
+# Phase 15: IXP Layer 2 Fabric Management
+#
+# Manages the IXP peering LAN bridge (OVS or Linux bridge + VLAN filtering),
+# handles member port provisioning, and publishes fabric utilization to DDS.
+#
+# NOT auto-enabled. Enable after ntari-ixp-bgp is running:
+#   rc-update add ntari-ixp-fabric default
+#   rc-service ntari-ixp-fabric start
+#
+# Publishes:
+#   /ixp/fabric/ports        — port inventory and VLAN assignments
+#   /ixp/fabric/utilization  — per-port tx/rx byte counters
+#   /ixp/fabric/health       — healthy | degraded | failed
+
+name="ntari-ixp-fabric"
+description="NTARI IXP Fabric Node — Layer 2 peering LAN + VLAN management"
+
+NTARI_IXP_CONF="${NTARI_IXP_CONF:-/etc/ntari/ixp.conf}"
+NTARI_IXP_FABRIC_HEALTH_INTERVAL="${NTARI_IXP_FABRIC_HEALTH_INTERVAL:-30}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ixp-fabric-node.py"
+command_background="yes"
+pidfile="/run/ntari-ixp-fabric.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ixp-fabric.log"
+error_log="/var/log/ntari/ixp-fabric.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-ixp-bgp
+    after ntari-ntp ntari-ixp-bgp
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /var/lib/ntari/ixp
+
+    if [ ! -f "${NTARI_IXP_CONF}" ]; then
+        eerror "IXP config not found: ${NTARI_IXP_CONF}"
+        return 1
+    fi
+
+    if ! grep -q "^enabled\s*=\s*true" "${NTARI_IXP_CONF}" 2>/dev/null; then
+        eerror "IXP not enabled in ${NTARI_IXP_CONF} — set [ixp] enabled = true"
+        return 1
+    fi
+
+    if [ ! -f /usr/local/bin/ixp-fabric-node.py ]; then
+        eerror "ixp-fabric-node.py not found — install ixp-fabric package"
+        return 1
+    fi
+
+    # Check iproute2 bridge utility is present
+    if ! command -v bridge >/dev/null 2>&1; then
+        ewarn "bridge utility not found — install iproute2 for VLAN management"
+    fi
+
+    einfo "IXP fabric node starting (config: ${NTARI_IXP_CONF})"
+}
+
+start_post() {
+    sleep 2
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish fabric healthy \
+            "config=${NTARI_IXP_CONF}" &
+    fi
+
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-ixp-fabric-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ixp-fabric-node.py >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish fabric healthy \
+                   config=${NTARI_IXP_CONF} \
+                   2>/dev/null || true
+                 sleep ${NTARI_IXP_FABRIC_HEALTH_INTERVAL}
+               done" \
+        >> /var/log/ntari/ixp-fabric.log 2>&1 || true
+
+    einfo "Fabric node running"
+    einfo "ros2 topic echo /ixp/fabric/ports"
+    einfo "ros2 topic echo /ixp/fabric/utilization"
+}
+
+stop_pre() {
+    einfo "Stopping IXP fabric node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish fabric failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-ixp-fabric-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-ixp-fabric-health.pid
+    # Bridge is intentionally left up to avoid disrupting live peering sessions
+}

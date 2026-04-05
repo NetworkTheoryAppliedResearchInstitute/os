@@ -1,0 +1,52 @@
+# Maintainer: NTARI <contact@ntari.org>
+pkgname=ixp-fabric
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="NTARI OS IXP Layer 2 Fabric Manager — VLAN provisioning + ROS2 lifecycle node"
+url="https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os"
+arch="x86_64 aarch64"
+license="AGPL-3.0"
+depends="
+	python3
+	py3-rclpy
+	iproute2
+	sqlite
+"
+optdepends="
+	openvswitch:software switching backend (VM/testing)
+"
+source="
+	ros2_fabric_node.py
+	switch_drivers/openvswitch.py
+	switch_drivers/netlink.py
+	fabric.conf.template
+"
+builddir="$srcdir"
+
+build() {
+	: # no compiled artifacts
+}
+
+check() {
+	python3 -m py_compile "$srcdir/ros2_fabric_node.py"
+	python3 -m py_compile "$srcdir/switch_drivers/openvswitch.py"
+	python3 -m py_compile "$srcdir/switch_drivers/netlink.py"
+}
+
+package() {
+	install -Dm755 "$srcdir/ros2_fabric_node.py" \
+		"$pkgdir/usr/local/bin/ixp-fabric-node.py"
+
+	install -Dm644 "$srcdir/switch_drivers/openvswitch.py" \
+		"$pkgdir/usr/lib/ntari/ixp-fabric/openvswitch.py"
+	install -Dm644 "$srcdir/switch_drivers/netlink.py" \
+		"$pkgdir/usr/lib/ntari/ixp-fabric/netlink.py"
+
+	install -Dm644 "$srcdir/fabric.conf.template" \
+		"$pkgdir/usr/share/ntari/ixp-fabric/fabric.conf.template"
+
+	install -dm755 "$pkgdir/var/lib/ntari/ixp"
+
+	install -Dm644 "$srcdir/../../../LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

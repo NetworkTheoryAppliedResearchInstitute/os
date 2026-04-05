@@ -1,0 +1,10 @@
+# NTARI OS — IXP Fabric Node Configuration
+# /etc/conf.d/ntari-ixp-fabric
+#
+# ntari-ixp-fabric is NOT auto-enabled. Enable with:
+#   rc-update add ntari-ixp-fabric default
+#
+# Primary configuration is in /etc/ntari/ixp.conf ([fabric] section).
+
+NTARI_IXP_CONF=/etc/ntari/ixp.conf
+NTARI_IXP_FABRIC_HEALTH_INTERVAL=30

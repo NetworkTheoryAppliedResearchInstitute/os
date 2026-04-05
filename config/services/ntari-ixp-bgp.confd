@@ -1,0 +1,17 @@
+# NTARI OS — IXP BGP Route Server Node Configuration
+# /etc/conf.d/ntari-ixp-bgp
+#
+# ntari-ixp-bgp is NOT auto-enabled. Enable with:
+#   rc-update add ntari-ixp-bgp default
+#
+# Primary configuration is in /etc/ntari/ixp.conf ([bgp] section).
+# This file controls service-level OpenRC parameters only.
+
+# Path to the unified IXP configuration file
+NTARI_IXP_CONF=/etc/ntari/ixp.conf
+
+# Health publish interval in seconds
+NTARI_IXP_BGP_HEALTH_INTERVAL=30
+
+# BGP listen port (standard: 179)
+NTARI_IXP_BGP_PORT=179

@@ -1,0 +1,21 @@
+! NTARI OS — FRRouting bgpd daemon configuration template
+! /etc/frr/bgpd.conf
+!
+! This file is used when FRR is run in split-daemon mode (bgpd only).
+! For integrated mode (single frr daemon), use frr.conf.template instead.
+! The ntari-ixp-bgp service defaults to integrated mode.
+
+router bgp {{ROUTER_ASN}}
+ bgp router-id {{ROUTER_ID}}
+ bgp log-neighbor-changes
+ no bgp client-to-client reflection
+ no bgp ebgp-requires-policy
+
+ neighbor RS-CLIENTS peer-group
+ neighbor RS-CLIENTS remote-as external
+ neighbor RS-CLIENTS route-server-client
+ neighbor RS-CLIENTS soft-reconfiguration inbound
+ neighbor RS-CLIENTS maximum-prefix {{MAX_PREFIXES_PER_PEER}} restart 5
+ neighbor RS-CLIENTS timers 30 90
+!
+end

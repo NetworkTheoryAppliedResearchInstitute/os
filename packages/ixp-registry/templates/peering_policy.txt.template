@@ -1,0 +1,34 @@
+NTARI IXP Peering Policy
+========================
+Version: 1.0
+Effective: {{DATE}}
+
+1. GENERAL
+   This exchange operates on an open peering policy for all connected members
+   in good standing. Members must agree to these terms before activation.
+
+2. TECHNICAL REQUIREMENTS
+   - Valid registered ASN (ARIN, RIPE, APNIC, or equivalent RIR)
+   - Route announcements must match IRR records (bgpq4-verified)
+   - No announcement of more-specific prefixes than /24 (IPv4) or /48 (IPv6)
+   - No announcement of default route (0.0.0.0/0 or ::/0)
+   - RPKI ROA records are strongly encouraged
+
+3. ROUTE SERVER
+   - Route server ASN: {{RS_ASN}}
+   - Route server IP (IPv4): {{RS_IP4}}
+   - Route server IP (IPv6): {{RS_IP6}}
+   - Route server operates with rs-client semantics (no next-hop rewrite)
+
+4. PREFIX LIMITS
+   - Maximum {{MAX_PREFIXES}} prefixes per member session
+   - Exceeding the limit results in session teardown and restart
+
+5. ACCEPTABLE USE
+   - No DDoS sourcing from peering LAN
+   - No traffic manipulation (no community-based blackholing of other members)
+   - Incident response: contact@ntari.org
+
+6. GOVERNANCE
+   Peering policy is governed by NTARI cooperative membership rules.
+   See: https://ntari.org/governance

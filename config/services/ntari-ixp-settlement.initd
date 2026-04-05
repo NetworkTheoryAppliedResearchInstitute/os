@@ -1,0 +1,113 @@
+#!/sbin/openrc-run
+# NTARI OS — IXP Settlement Node (ixp_settlement_node)
+# Phase 19: Lightning-Settled Paid Peering (optional)
+#
+# Subscribes to /ixp/fabric/utilization, computes per-member traffic
+# deltas, and generates Lightning invoices via SoHoLINK's API.
+#
+# This service is entirely optional. The IXP operates without it.
+# Requires: SoHoLINK running + ixp.conf [settlement] enabled = true
+#
+# NOT auto-enabled:
+#   rc-update add ntari-ixp-settlement default
+#   rc-service ntari-ixp-settlement start
+#
+# Publishes:
+#   /ixp/settlement/invoices  — pending Lightning invoices
+#   /ixp/settlement/health    — healthy | degraded | failed
+
+name="ntari-ixp-settlement"
+description="NTARI IXP Settlement Node — Lightning-settled paid peering (optional)"
+
+NTARI_IXP_CONF="${NTARI_IXP_CONF:-/etc/ntari/ixp.conf}"
+NTARI_IXP_SETTLEMENT_HEALTH_INTERVAL="${NTARI_IXP_SETTLEMENT_HEALTH_INTERVAL:-60}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ixp-settlement-node.py"
+command_background="yes"
+pidfile="/run/ntari-ixp-settlement.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ixp-settlement.log"
+error_log="/var/log/ntari/ixp-settlement.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-ixp-registry ntari-ixp-fabric
+    after ntari-ixp-registry ntari-ixp-fabric ntari-ntp
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /var/lib/ntari/ixp
+
+    if [ ! -f "${NTARI_IXP_CONF}" ]; then
+        eerror "IXP config not found: ${NTARI_IXP_CONF}"
+        return 1
+    fi
+
+    # Settlement-specific enabled check
+    if ! grep -q "^enabled\s*=\s*true" "${NTARI_IXP_CONF}" 2>/dev/null; then
+        eerror "Settlement not enabled in ${NTARI_IXP_CONF}"
+        eerror "Set [settlement] enabled = true and configure soholink_api"
+        return 1
+    fi
+
+    if [ ! -f /usr/local/bin/ixp-settlement-node.py ]; then
+        eerror "ixp-settlement-node.py not found — install ixp-settlement package"
+        return 1
+    fi
+
+    einfo "IXP settlement node starting"
+    einfo "SoHoLINK API: $(grep -m1 soholink_api ${NTARI_IXP_CONF} | awk -F= '{print $2}' | tr -d ' ')"
+}
+
+start_post() {
+    sleep 2
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish settlement healthy \
+            "config=${NTARI_IXP_CONF}" &
+    fi
+
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-ixp-settlement-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ixp-settlement-node.py >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish settlement healthy \
+                   config=${NTARI_IXP_CONF} \
+                   2>/dev/null || true
+                 sleep ${NTARI_IXP_SETTLEMENT_HEALTH_INTERVAL}
+               done" \
+        >> /var/log/ntari/ixp-settlement.log 2>&1 || true
+
+    einfo "Settlement node running"
+    einfo "ros2 topic echo /ixp/settlement/invoices"
+    einfo "Audit ledger: $(grep -m1 ledger_path ${NTARI_IXP_CONF} | awk -F= '{print $2}' | tr -d ' ')"
+}
+
+stop_pre() {
+    einfo "Stopping IXP settlement node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish settlement failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-ixp-settlement-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-ixp-settlement-health.pid
+}

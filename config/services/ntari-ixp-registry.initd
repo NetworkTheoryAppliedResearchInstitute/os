@@ -1,0 +1,113 @@
+#!/sbin/openrc-run
+# NTARI OS — IXP Registry Node (ixp_registry_node)
+# Phase 16: Member Registry + PeeringDB Integration
+#
+# Manages IXP membership: publishes the member list to DDS,
+# syncs prefix data from PeeringDB, and detects unauthorized BGP sessions.
+#
+# NOT auto-enabled. Enable after ntari-ixp-fabric is running:
+#   rc-update add ntari-ixp-registry default
+#   rc-service ntari-ixp-registry start
+#
+# Publishes:
+#   /ixp/members/list        — JSON list of active members
+#   /ixp/members/provisioned — fires on new member activation
+#   /ixp/registry/health     — healthy | degraded | failed
+
+name="ntari-ixp-registry"
+description="NTARI IXP Registry Node — member DB + PeeringDB + IRR filter generation"
+
+NTARI_IXP_CONF="${NTARI_IXP_CONF:-/etc/ntari/ixp.conf}"
+NTARI_IXP_REGISTRY_HEALTH_INTERVAL="${NTARI_IXP_REGISTRY_HEALTH_INTERVAL:-60}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ixp-registry-node.py"
+command_background="yes"
+pidfile="/run/ntari-ixp-registry.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ixp-registry.log"
+error_log="/var/log/ntari/ixp-registry.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-ixp-bgp ntari-ixp-fabric
+    after ntari-ntp ntari-ixp-bgp ntari-ixp-fabric
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari /var/lib/ntari/ixp /etc/frr/prefix-lists
+
+    if [ ! -f "${NTARI_IXP_CONF}" ]; then
+        eerror "IXP config not found: ${NTARI_IXP_CONF}"
+        return 1
+    fi
+
+    if ! grep -q "^enabled\s*=\s*true" "${NTARI_IXP_CONF}" 2>/dev/null; then
+        eerror "IXP not enabled in ${NTARI_IXP_CONF}"
+        return 1
+    fi
+
+    if [ ! -f /usr/local/bin/ixp-registry-node.py ]; then
+        eerror "ixp-registry-node.py not found — install ixp-registry package"
+        return 1
+    fi
+
+    # Check bgpq4 is available for IRR filter generation
+    if ! command -v bgpq4 >/dev/null 2>&1; then
+        ewarn "bgpq4 not found — IRR prefix filter generation unavailable"
+    fi
+
+    einfo "IXP registry node starting"
+}
+
+start_post() {
+    sleep 2
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish registry healthy \
+            "config=${NTARI_IXP_CONF}" &
+    fi
+
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-ixp-registry-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ixp-registry-node.py >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish registry healthy \
+                   config=${NTARI_IXP_CONF} \
+                   2>/dev/null || true
+                 sleep ${NTARI_IXP_REGISTRY_HEALTH_INTERVAL}
+               done" \
+        >> /var/log/ntari/ixp-registry.log 2>&1 || true
+
+    einfo "Registry node running"
+    einfo "Provision members: ixp-registry-provision --help"
+    einfo "ros2 topic echo /ixp/members/list"
+}
+
+stop_pre() {
+    einfo "Stopping IXP registry node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish registry failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-ixp-registry-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-ixp-registry-health.pid
+}

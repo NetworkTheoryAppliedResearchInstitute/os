@@ -1,0 +1,20 @@
+Welcome to the NTARI IXP, {{ORG}} (AS{{ASN}})!
+
+Your peering session has been activated.
+
+Peering details:
+  ASN:          AS{{ASN}}
+  Peering IP:   {{PEERING_IP4}}
+  Route server: Please see IXP_MEMBER_ONBOARDING.md for RS IPs and config
+
+Next steps:
+1. Configure your router to peer with the route server at the assigned IP.
+2. Announce your prefixes — IRR filters are already in place via bgpq4.
+3. Check session status: visit /lg/peer/{{ASN}} on the Looking Glass.
+4. Review the peering policy: /etc/ntari/ixp.conf [bgp] section.
+
+DDS graph:
+  ros2 topic echo /ixp/members/list
+  ros2 topic echo /ixp/bgp/peers
+
+Questions: contact@ntari.org

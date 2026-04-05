@@ -1,0 +1,57 @@
+# Maintainer: NTARI <contact@ntari.org>
+pkgname=ixp-bgp
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="NTARI OS IXP BGP Route Server — FRRouting + ROS2 lifecycle node wrapper"
+url="https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os"
+arch="x86_64 aarch64"
+license="AGPL-3.0"
+depends="
+	frr
+	frr-bgpd
+	bgpq4
+	python3
+	py3-rclpy
+	gortr
+"
+source="
+	ros2_bgp_node.py
+	bgp_monitor.py
+	frr.conf.template
+	bird.conf.template
+	bgpd.conf.template
+"
+builddir="$srcdir"
+
+build() {
+	: # no compiled artifacts; Python + shell only
+}
+
+check() {
+	python3 -m py_compile "$srcdir/ros2_bgp_node.py"
+	python3 -m py_compile "$srcdir/bgp_monitor.py"
+}
+
+package() {
+	# ROS2 lifecycle node wrapper
+	install -Dm755 "$srcdir/ros2_bgp_node.py" \
+		"$pkgdir/usr/local/bin/ixp-bgp-node.py"
+
+	# BGP state monitor (called by the lifecycle node)
+	install -Dm755 "$srcdir/bgp_monitor.py" \
+		"$pkgdir/usr/local/bin/ixp-bgp-monitor.py"
+
+	# Config templates (written to /etc/ntari/ on first start)
+	install -Dm644 "$srcdir/frr.conf.template" \
+		"$pkgdir/usr/share/ntari/ixp-bgp/frr.conf.template"
+	install -Dm644 "$srcdir/bird.conf.template" \
+		"$pkgdir/usr/share/ntari/ixp-bgp/bird.conf.template"
+	install -Dm644 "$srcdir/bgpd.conf.template" \
+		"$pkgdir/usr/share/ntari/ixp-bgp/bgpd.conf.template"
+
+	# Prefix-list directory used by irr_filter_gen
+	install -dm755 "$pkgdir/etc/frr/prefix-lists"
+
+	install -Dm644 "$srcdir/../../../LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

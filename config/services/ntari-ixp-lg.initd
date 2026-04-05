@@ -1,0 +1,137 @@
+#!/sbin/openrc-run
+# NTARI OS — IXP Looking Glass Node (ixp_lg_node)
+# Phase 18: Looking Glass Service
+#
+# Starts the Looking Glass HTTP server (port 5000 internal) and patches
+# Caddyfile to expose /lg/* via the existing ntari-web reverse proxy.
+#
+# NOT auto-enabled. Enable after ntari-ixp-registry is running:
+#   rc-update add ntari-ixp-lg default
+#   rc-service ntari-ixp-lg start
+#
+# Access: http://ntari.local/lg/
+#
+# Publishes:
+#   /ixp/lg/health  — healthy | failed
+
+name="ntari-ixp-lg"
+description="NTARI IXP Looking Glass — read-only BGP visibility tool"
+
+NTARI_IXP_CONF="${NTARI_IXP_CONF:-/etc/ntari/ixp.conf}"
+NTARI_IXP_LG_PORT="${NTARI_IXP_LG_PORT:-5000}"
+NTARI_IXP_LG_HEALTH_INTERVAL="${NTARI_IXP_LG_HEALTH_INTERVAL:-30}"
+NTARI_IXP_LG_CADDY_CONF="${NTARI_IXP_LG_CADDY_CONF:-/etc/ntari/Caddyfile}"
+
+command="/usr/bin/python3"
+command_args="/usr/local/bin/ixp-lg-node.py"
+command_background="yes"
+pidfile="/run/ntari-ixp-lg.pid"
+command_user="root"
+
+output_log="/var/log/ntari/ixp-lg.log"
+error_log="/var/log/ntari/ixp-lg.log"
+
+# ── ROS2 environment ─────────────────────────────────────────────────────────
+export AMENT_PREFIX_PATH="/usr/ros/jazzy"
+export CMAKE_PREFIX_PATH="/usr/ros/jazzy"
+export LD_LIBRARY_PATH="/usr/ros/jazzy/lib:/usr/ros/jazzy/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="/usr/ros/jazzy/bin:/usr/local/sbin:/usr/sbin:/sbin:${PATH}"
+export PYTHONPATH="/usr/ros/jazzy/lib/python3.12/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+export ROS_VERSION="2"
+export ROS_PYTHON_VERSION="3"
+export ROS_DISTRO="jazzy"
+export NTARI_IXP_LG_PORT
+
+if [ -f /etc/ntari/cyclonedds.xml ]; then
+    export CYCLONEDDS_URI="file:///etc/ntari/cyclonedds.xml"
+fi
+
+depend() {
+    need net ros2-domain ntari-web ntari-ixp-registry
+    after ntari-web ntari-ixp-registry
+}
+
+start_pre() {
+    mkdir -p /var/log/ntari
+
+    if [ ! -f "${NTARI_IXP_CONF}" ]; then
+        eerror "IXP config not found: ${NTARI_IXP_CONF}"
+        return 1
+    fi
+
+    if [ ! -f /usr/local/bin/ixp-lg-node.py ]; then
+        eerror "ixp-lg-node.py not found — install ixp-looking-glass package"
+        return 1
+    fi
+
+    # Verify FRRouting vtysh is present (required for queries)
+    if [ ! -x /usr/bin/vtysh ]; then
+        eerror "vtysh not found — install frr package"
+        return 1
+    fi
+
+    # ── Patch Caddyfile for /lg/* → localhost:PORT ────────────────────────────
+    if [ -f "${NTARI_IXP_LG_CADDY_CONF}" ]; then
+        if ! grep -q "reverse_proxy.*${NTARI_IXP_LG_PORT}" \
+                "${NTARI_IXP_LG_CADDY_CONF}" 2>/dev/null; then
+            einfo "Adding /lg/ reverse proxy to Caddyfile"
+            local TMP_CADDY
+            TMP_CADDY=$(mktemp)
+            awk '
+            /^}[[:space:]]*$/ && !inserted {
+                print "    # Phase 18: Looking Glass"
+                print "    handle /lg* {"
+                print "        reverse_proxy localhost:'"${NTARI_IXP_LG_PORT}"'"
+                print "    }"
+                inserted=1
+            }
+            { print }
+            ' "${NTARI_IXP_LG_CADDY_CONF}" > "${TMP_CADDY}" && \
+            cp "${TMP_CADDY}" "${NTARI_IXP_LG_CADDY_CONF}"
+            rm -f "${TMP_CADDY}"
+        else
+            einfo "Caddyfile already has /lg/ route"
+        fi
+    else
+        ewarn "Caddyfile not found — ntari-web may not be configured yet"
+    fi
+
+    einfo "Looking Glass starting on port ${NTARI_IXP_LG_PORT}"
+}
+
+start_post() {
+    sleep 2
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish lg healthy \
+            "port=${NTARI_IXP_LG_PORT}" &
+    fi
+
+    start-stop-daemon --start --background \
+        --make-pidfile --pidfile /run/ntari-ixp-lg-health.pid \
+        --exec /bin/sh \
+        -- -c "while pgrep -f ixp-lg-node.py >/dev/null 2>&1; do
+                 /usr/local/bin/ros2-node-health publish lg healthy \
+                   port=${NTARI_IXP_LG_PORT} \
+                   2>/dev/null || true
+                 sleep ${NTARI_IXP_LG_HEALTH_INTERVAL}
+               done" \
+        >> /var/log/ntari/ixp-lg.log 2>&1 || true
+
+    einfo "Looking Glass running — http://ntari.local/lg/"
+    einfo "Health publishing active on /ixp/lg/health"
+}
+
+stop_pre() {
+    einfo "Stopping IXP Looking Glass node"
+
+    if [ -x /usr/local/bin/ros2-node-health ]; then
+        ros2-node-health publish lg failed "reason=service_stopped" || true
+    fi
+
+    start-stop-daemon --stop --pidfile /run/ntari-ixp-lg-health.pid \
+        --retry TERM/5/KILL/1 >/dev/null 2>&1 || true
+    rm -f /run/ntari-ixp-lg-health.pid
+}

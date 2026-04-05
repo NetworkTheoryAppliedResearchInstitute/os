@@ -1,0 +1,13 @@
+# NTARI OS — IXP Fabric Node Configuration Template
+# Written to /etc/ntari/fabric.conf on first start if absent.
+# Override values in ixp.conf [fabric] section.
+
+[fabric]
+backend = auto
+peering_bridge = br-ixp
+port_prefix = eth
+ixp_lan_ipv4 = 192.0.2.0/24
+ixp_lan_ipv6 = 2001:db8::/32
+
+# SQLite database for IP address pool management
+db_path = /var/lib/ntari/ixp/fabric.db

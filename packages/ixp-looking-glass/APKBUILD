@@ -1,0 +1,40 @@
+# Maintainer: NTARI <contact@ntari.org>
+pkgname=ixp-looking-glass
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="NTARI OS IXP Looking Glass — member-facing BGP visibility tool + ROS2 node"
+url="https://github.com/NetworkTheoryAppliedResearchInstitute/ntari-os"
+arch="x86_64 aarch64"
+license="AGPL-3.0"
+depends="
+	python3
+	py3-rclpy
+	frr
+"
+source="
+	ros2_lg_node.py
+	lg_server.py
+	templates/looking_glass.html
+"
+builddir="$srcdir"
+
+build() {
+	: # no compiled artifacts
+}
+
+check() {
+	python3 -m py_compile "$srcdir/ros2_lg_node.py"
+	python3 -m py_compile "$srcdir/lg_server.py"
+}
+
+package() {
+	install -Dm755 "$srcdir/ros2_lg_node.py" \
+		"$pkgdir/usr/local/bin/ixp-lg-node.py"
+	install -Dm755 "$srcdir/lg_server.py" \
+		"$pkgdir/usr/local/bin/ixp-lg-server.py"
+	install -Dm644 "$srcdir/templates/looking_glass.html" \
+		"$pkgdir/usr/share/ntari/ixp-lg/looking_glass.html"
+
+	install -Dm644 "$srcdir/../../../LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
