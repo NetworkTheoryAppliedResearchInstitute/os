@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTARI OS — Network Graph</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=DM+Serif+Display:ital@0;1&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --void: #050608;
+    --deep: #080c12;
+    --surface: #0d1420;
+    --rim: #14202e;
+    --wire: #1a3a5c;
+    --wire-bright: #2a6090;
+    --node-core: #e8f4ff;
+    --node-glow: #4ab3ff;
+    --node-pulse: #00d4ff;
+    --label: #a8cce8;
+    --label-bright: #ddeeff;
+    --accent: #ff6b35;
+    --accent-dim: rgba(255, 107, 53, 0.15);
+    --search-border: rgba(74, 179, 255, 0.25);
+    --search-bg: rgba(8, 18, 32, 0.85);
+    --text-muted: #3a5a7a;
+    --text-dim: #1e3a52;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --serif: 'DM Serif Display', Georgia, serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--void);
+    color: var(--label);
+    font-family: var(--mono);
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* Subtle grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 100;
+    opacity: 0.4;
+  }
+
+  /* Radial ambient glow behind globe */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(ellipse, rgba(30, 80, 140, 0.12) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+    transition: width 1.2s cubic-bezier(0.23, 1, 0.32, 1),
+                height 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  /* Main canvas */
+  #globe-canvas {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+  }
+
+  /* ─── HUD CHROME ─── */
+  .hud {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Top-left: wordmark */
+  .wordmark {
+    position: fixed;
+    top: 32px; left: 36px;
+    pointer-events: none;
+  }
+  .wordmark-title {
+    font-family: var(--serif);
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    color: var(--label-bright);
+    opacity: 0.9;
+  }
+  .wordmark-sub {
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    margin-top: 3px;
+    text-transform: uppercase;
+  }
+
+  /* Top-right: network stats */
+  .net-stats {
+    position: fixed;
+    top: 32px; right: 36px;
+    text-align: right;
+    pointer-events: none;
+  }
+  .stat-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--label-bright);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s;
+  }
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .stat-row.highlight .stat-value { color: var(--node-pulse); }
+
+  /* Bottom-left: status ticker */
+  .status-bar {
+    position: fixed;
+    bottom: 28px; left: 36px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--node-pulse);
+    box-shadow: 0 0 6px var(--node-pulse);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  .status-text {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  /* Bottom-right: scale indicator */
+  .scale-indicator {
+    position: fixed;
+    bottom: 28px; right: 36px;
+    text-align: right;
+    pointer-events: none;
+  }
+  .scale-bar-track {
+    width: 80px; height: 1px;
+    background: var(--text-dim);
+    margin-left: auto;
+    position: relative;
+  }
+  .scale-bar-fill {
+    height: 100%;
+    background: var(--wire-bright);
+    transition: width 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+    width: 20%;
+  }
+  .scale-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    margin-top: 5px;
+    text-transform: uppercase;
+  }
+
+  /* ─── SEARCH ─── */
+  .search-container {
+    position: fixed;
+    top: 50%;
+    right: 48px;
+    transform: translateY(-50%);
+    z-index: 20;
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .search-label {
+    font-size: 8px;
+    letter-spacing: 0.35em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding-right: 2px;
+  }
+
+  .search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-input {
+    background: var(--search-bg);
+    border: 1px solid var(--search-border);
+    border-radius: 2px;
+    color: var(--label-bright);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 10px 36px 10px 14px;
+    width: 180px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, width 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .search-input::placeholder {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+  }
+  .search-input:focus {
+    border-color: rgba(74, 179, 255, 0.5);
+    box-shadow: 0 0 0 1px rgba(74, 179, 255, 0.1),
+                0 4px 20px rgba(0, 0, 0, 0.4);
+    width: 220px;
+  }
+
+  .search-icon {
+    position: absolute; right: 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  /* Search results dropdown */
+  .search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    width: 220px;
+    background: var(--search-bg);
+    border: 1px solid var(--search-border);
+    border-radius: 2px;
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    display: none;
+  }
+  .search-results.visible { display: block; }
+  .search-result-item {
+    padding: 9px 14px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--label);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border-bottom: 1px solid rgba(74, 179, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover {
+    background: rgba(74, 179, 255, 0.08);
+    color: var(--label-bright);
+  }
+  .result-dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--node-glow);
+    flex-shrink: 0;
+  }
+
+  /* ─── NODE CONTROLS (demo) ─── */
+  .controls {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    z-index: 20;
+    pointer-events: all;
+  }
+
+  .ctrl-btn {
+    background: rgba(8, 18, 32, 0.8);
+    border: 1px solid var(--rim);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+  .ctrl-btn:first-child { border-radius: 2px 0 0 2px; }
+  .ctrl-btn:last-child { border-radius: 0 2px 2px 0; }
+  .ctrl-btn:not(:first-child):not(:last-child) { border-left: none; border-right: none; }
+  .ctrl-btn:hover {
+    background: rgba(74, 179, 255, 0.08);
+    border-color: var(--search-border);
+    color: var(--label);
+  }
+  .ctrl-btn.danger:hover {
+    background: rgba(255, 107, 53, 0.08);
+    border-color: rgba(255, 107, 53, 0.3);
+    color: var(--accent);
+  }
+  .ctrl-btn-sep {
+    width: 1px; height: 28px;
+    background: var(--rim);
+  }
+
+  /* ─── NODE DETAIL PANEL ─── */
+  .node-panel {
+    position: fixed;
+    top: 50%;
+    left: 48px;
+    transform: translateY(-50%);
+    width: 200px;
+    background: var(--search-bg);
+    border: 1px solid var(--search-border);
+    border-radius: 2px;
+    backdrop-filter: blur(12px);
+    padding: 18px;
+    z-index: 20;
+    pointer-events: all;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  .node-panel.visible {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+  .panel-close {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: none; border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    font-family: var(--mono);
+    line-height: 1;
+    transition: color 0.2s;
+    pointer-events: all;
+  }
+  .panel-close:hover { color: var(--label); }
+  .panel-node-name {
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--label-bright);
+    margin-bottom: 14px;
+    padding-right: 20px;
+    line-height: 1.3;
+  }
+  .panel-field {
+    margin-bottom: 10px;
+  }
+  .panel-field-label {
+    font-size: 8px;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .panel-field-value {
+    font-size: 11px;
+    color: var(--label);
+    letter-spacing: 0.05em;
+  }
+  .panel-field-value.live {
+    color: var(--node-pulse);
+  }
+  .panel-divider {
+    border: none;
+    border-top: 1px solid var(--rim);
+    margin: 12px 0;
+  }
+  .panel-topics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .topic-pill {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--node-glow);
+    background: rgba(74, 179, 255, 0.06);
+    border: 1px solid rgba(74, 179, 255, 0.15);
+    border-radius: 1px;
+    padding: 4px 8px;
+    display: inline-block;
+  }
+
+  /* ─── INTRO ANIMATION ─── */
+  .intro-veil {
+    position: fixed; inset: 0;
+    background: var(--void);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    animation: veil-fade 0.8s ease-in 1.6s forwards;
+    pointer-events: none;
+  }
+  @keyframes veil-fade {
+    to { opacity: 0; pointer-events: none; }
+  }
+  .intro-text {
+    font-family: var(--serif);
+    font-size: 28px;
+    color: var(--label-bright);
+    opacity: 0;
+    animation: intro-word 0.6s ease-out 0.3s forwards;
+  }
+  @keyframes intro-word {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .intro-sub {
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    opacity: 0;
+    animation: intro-word 0.6s ease-out 0.7s forwards;
+  }
+</style>
+</head>
+<body>
+
+<!-- Intro veil -->
+<div class="intro-veil">
+  <div class="intro-text">NTARI OS</div>
+  <div class="intro-sub">Initializing network graph</div>
+</div>
+
+<canvas id="globe-canvas"></canvas>
+
+<!-- HUD -->
+<div class="hud">
+  <!-- Wordmark -->
+  <div class="wordmark">
+    <div class="wordmark-title">NTARI OS</div>
+    <div class="wordmark-sub">Network Graph · v0.1.0</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="net-stats">
+    <div class="stat-row">
+      <span class="stat-label">Nodes</span>
+      <span class="stat-value" id="stat-nodes">2</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Topics</span>
+      <span class="stat-value" id="stat-topics">4</span>
+    </div>
+    <div class="stat-row highlight">
+      <span class="stat-label">Active</span>
+      <span class="stat-value" id="stat-active">2</span>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <div class="status-text" id="status-text">Graph online · DDS domain 0</div>
+  </div>
+
+  <!-- Scale indicator -->
+  <div class="scale-indicator">
+    <div class="scale-bar-track">
+      <div class="scale-bar-fill" id="scale-fill"></div>
+    </div>
+    <div class="scale-label" id="scale-label">2 nodes · local</div>
+  </div>
+</div>
+
+<!-- Search -->
+<div class="search-container">
+  <div class="search-label">Find node</div>
+  <div class="search-input-wrap">
+    <input class="search-input" id="search-input" type="text" placeholder="node name or topic…" autocomplete="off" spellcheck="false">
+    <span class="search-icon">⌕</span>
+    <div class="search-results" id="search-results"></div>
+  </div>
+</div>
+
+<!-- Node detail panel -->
+<div class="node-panel" id="node-panel">
+  <button class="panel-close" id="panel-close">✕</button>
+  <div class="panel-node-name" id="panel-name">node_name</div>
+  <div class="panel-field">
+    <div class="panel-field-label">Status</div>
+    <div class="panel-field-value live" id="panel-status">active</div>
+  </div>
+  <div class="panel-field">
+    <div class="panel-field-label">Latency</div>
+    <div class="panel-field-value" id="panel-latency">—</div>
+  </div>
+  <div class="panel-field">
+    <div class="panel-field-label">RMW</div>
+    <div class="panel-field-value">cyclonedds</div>
+  </div>
+  <hr class="panel-divider">
+  <div class="panel-field-label">Subscribed Topics</div>
+  <div class="panel-topics" id="panel-topics"></div>
+</div>
+
+<!-- Demo controls -->
+<div class="controls">
+  <button class="ctrl-btn" id="btn-add">+ Add node</button>
+  <button class="ctrl-btn" id="btn-add5">+ Add 5</button>
+  <button class="ctrl-btn" id="btn-add10">+ Add 10</button>
+  <button class="ctrl-btn danger" id="btn-reset">Reset</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// NTARI OS — Globe Network Graph
+// Canvas-based, no external dependencies
+// ─────────────────────────────────────────────
+
+const canvas = document.getElementById('globe-canvas');
+const ctx = canvas.getContext('2d');
+
+// ── State ──────────────────────────────────────
+const state = {
+  nodes: [],
+  edges: [],
+  globeRadius: 0,         // current rendered radius (px)
+  targetGlobeRadius: 0,   // what we're animating toward
+  rotation: { x: 0.3, y: 0 },
+  autoRotate: true,
+  drag: { active: false, lastX: 0, lastY: 0 },
+  zoom: 1,
+  targetZoom: 1,
+  selectedNode: null,
+  hoveredNode: null,
+  tick: 0,
+  baseRadius: 140,        // starting globe radius (px)
+  maxRadius: 320,         // maximum globe radius (px)
+  W: 0, H: 0,
+};
+
+// ── Node data ───────────────────────────────────
+const NODE_NAMES = [
+  'core.scheduler', 'mesh.relay_0', 'sensor.ambient',
+  'comms.broadcast', 'store.ledger', 'ui.kiosk_north',
+  'ui.kiosk_south', 'monitor.health', 'alert.emergency',
+  'auth.gateway', 'sync.clock_master', 'edge.solar_01',
+  'edge.solar_02', 'peer.neighbor_coop', 'nav.mesh_router',
+  'data.archive', 'feed.community', 'relay.uplink',
+  'sensor.water', 'ctrl.power_grid',
+];
+
+const TOPICS = [
+  '/system/heartbeat', '/mesh/topology', '/alerts/emergency',
+  '/data/sensor_ambient', '/comms/broadcast', '/auth/tokens',
+  '/sync/time', '/edge/power', '/community/feed', '/nav/routes',
+];
+
+// ── 3D → 2D projection ──────────────────────────
+function project(x, y, z) {
+  const cx = state.W / 2, cy = state.H / 2;
+  const r = state.globeRadius * state.zoom;
+  // Rotate around Y then X
+  const ry = state.rotation.y;
+  const rx = state.rotation.x;
+  // Y rotation
+  const x1 = x * Math.cos(ry) - z * Math.sin(ry);
+  const z1 = x * Math.sin(ry) + z * Math.cos(ry);
+  const y1 = y;
+  // X rotation
+  const x2 = x1;
+  const y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
+  const z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
+
+  return {
+    sx: cx + x2 * r,
+    sy: cy + y2 * r,
+    sz: z2,
+    visible: z2 > -0.1, // behind the sphere?
+  };
+}
+
+// Spherical → cartesian
+function spherePoint(lat, lon) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  return {
+    x: -(Math.sin(phi) * Math.cos(theta)),
+    y: Math.cos(phi),
+    z: Math.sin(phi) * Math.sin(theta),
+  };
+}
+
+// ── Node creation ───────────────────────────────
+function makeNode(name, lat, lon) {
+  const pt = spherePoint(lat, lon);
+  return {
+    id: Math.random().toString(36).slice(2),
+    name,
+    lat, lon,
+    x: pt.x, y: pt.y, z: pt.z,
+    topics: TOPICS.slice(0, Math.floor(Math.random() * 3) + 1),
+    latency: Math.floor(Math.random() * 80) + 2,
+    pulsePhase: Math.random() * Math.PI * 2,
+    pulseSpeed: 0.6 + Math.random() * 0.8,
+    born: state.tick,
+  };
+}
+
+// Distribute nodes so farthest is on "opposite side"
+function placeNode(index, total, referenceNode) {
+  if (index === 0) return { lat: 20, lon: -30 };
+  if (index === 1) return { lat: -25, lon: 140 }; // roughly opposite
+
+  // Distribute remaining nodes based on a latency-inspired distance from node 0
+  // More spread out = farther in the network graph
+  const t = index / (total - 1);
+  const lat = (Math.random() - 0.5) * 140;
+  const lon = (Math.random() - 0.5) * 360;
+  return { lat, lon };
+}
+
+function addNode(name) {
+  const idx = state.nodes.length;
+  const { lat, lon } = placeNode(idx, Math.max(idx + 1, 3));
+  const node = makeNode(name || NODE_NAMES[idx % NODE_NAMES.length], lat, lon);
+  state.nodes.push(node);
+
+  // Add edges to nearby nodes (simulate topic connections)
+  if (state.nodes.length > 1) {
+    const prev = state.nodes[Math.floor(Math.random() * (state.nodes.length - 1))];
+    state.edges.push({ from: prev.id, to: node.id, born: state.tick });
+  }
+
+  updateGlobeTarget();
+  updateHUD();
+}
+
+function addNodes(count) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => addNode(), i * 180);
+  }
+}
+
+function resetNodes() {
+  state.nodes = [];
+  state.edges = [];
+  updateGlobeTarget();
+  updateHUD();
+  closePanel();
+}
+
+// ── Globe sizing ────────────────────────────────
+function updateGlobeTarget() {
+  const n = state.nodes.length;
+  if (n === 0) {
+    state.targetGlobeRadius = state.baseRadius * 0.5;
+  } else {
+    // Logarithmic growth: small network = intimate globe, large = expansive
+    const growth = Math.log(n + 1) / Math.log(20);
+    state.targetGlobeRadius = state.baseRadius + (state.maxRadius - state.baseRadius) * Math.min(growth, 1);
+  }
+
+  // Auto-zoom for density
+  const density = n / 10;
+  state.targetZoom = n > 10 ? Math.max(0.55, 1 - (density - 1) * 0.12) : 1;
+
+  // Update scale indicator
+  const fill = Math.min(100, (n / 20) * 100);
+  document.getElementById('scale-fill').style.width = fill + '%';
+
+  const labels = ['local', 'neighborhood', 'district', 'regional', 'cooperative'];
+  const labelIdx = Math.min(Math.floor(n / 4), labels.length - 1);
+  document.getElementById('scale-label').textContent =
+    `${n} node${n !== 1 ? 's' : ''} · ${labels[labelIdx] || 'cooperative'}`;
+}
+
+// ── HUD updates ─────────────────────────────────
+function updateHUD() {
+  document.getElementById('stat-nodes').textContent = state.nodes.length;
+  document.getElementById('stat-topics').textContent =
+    [...new Set(state.nodes.flatMap(n => n.topics))].length;
+  document.getElementById('stat-active').textContent = state.nodes.length;
+}
+
+// ── Drawing ─────────────────────────────────────
+function drawWireframe() {
+  const r = state.globeRadius;
+  const cx = state.W / 2, cy = state.H / 2;
+  const gridLines = 10; // number of latitude/longitude lines
+  const segments = 64;
+
+  ctx.save();
+
+  // Draw longitude lines
+  for (let i = 0; i < gridLines; i++) {
+    const lon = (i / gridLines) * 360 - 180;
+    ctx.beginPath();
+    let first = true;
+    for (let j = 0; j <= segments; j++) {
+      const lat = (j / segments) * 180 - 90;
+      const pt = spherePoint(lat, lon);
+      const { sx, sy, sz, visible } = project(pt.x, pt.y, pt.z);
+      const alpha = visible ? 0.18 : 0.04;
+      if (first || !visible) {
+        ctx.moveTo(sx, sy);
+        first = false;
+      } else {
+        ctx.lineTo(sx, sy);
+      }
+    }
+    ctx.strokeStyle = `rgba(26, 58, 92, 0.5)`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Draw latitude lines
+  for (let i = 0; i <= gridLines; i++) {
+    const lat = (i / gridLines) * 180 - 90;
+    ctx.beginPath();
+    let first = true;
+    for (let j = 0; j <= segments; j++) {
+      const lon = (j / segments) * 360 - 180;
+      const pt = spherePoint(lat, lon);
+      const { sx, sy, sz, visible } = project(pt.x, pt.y, pt.z);
+      const isFront = sz > 0;
+      if (first) {
+        ctx.moveTo(sx, sy); first = false;
+      } else {
+        ctx.lineTo(sx, sy);
+      }
+    }
+    ctx.strokeStyle = `rgba(26, 58, 92, 0.5)`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Sphere silhouette ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * state.zoom, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(42, 96, 144, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Subtle fill for depth
+  const grad = ctx.createRadialGradient(cx - r * 0.2 * state.zoom, cy - r * 0.15 * state.zoom, 0, cx, cy, r * state.zoom);
+  grad.addColorStop(0, 'rgba(20, 40, 70, 0.12)');
+  grad.addColorStop(1, 'rgba(5, 10, 18, 0.25)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEdges() {
+  for (const edge of state.edges) {
+    const fromNode = state.nodes.find(n => n.id === edge.from);
+    const toNode = state.nodes.find(n => n.id === edge.to);
+    if (!fromNode || !toNode) continue;
+
+    const a = project(fromNode.x, fromNode.y, fromNode.z);
+    const b = project(toNode.x, toNode.y, toNode.z);
+
+    if (!a.visible && !b.visible) continue;
+
+    const age = (state.tick - edge.born) / 60;
+    const opacity = Math.min(1, age) * 0.25;
+
+    // Arc through slightly above globe center
+    const mx = (a.sx + b.sx) / 2;
+    const my = (a.sy + b.sy) / 2;
+    const cx = state.W / 2, cy = state.H / 2;
+    const pullX = mx + (cx - mx) * 0.05;
+    const pullY = my + (cy - my) * 0.05;
+
+    ctx.beginPath();
+    ctx.moveTo(a.sx, a.sy);
+    ctx.quadraticCurveTo(pullX, pullY, b.sx, b.sy);
+    ctx.strokeStyle = `rgba(74, 179, 255, ${opacity * (a.visible && b.visible ? 1 : 0.4)})`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+}
+
+function drawNodes() {
+  // Sort by z (farthest drawn first)
+  const sorted = [...state.nodes].sort((a, b) => {
+    const pa = project(a.x, a.y, a.z);
+    const pb = project(b.x, b.y, b.z);
+    return pa.sz - pb.sz;
+  });
+
+  for (const node of sorted) {
+    const p = project(node.x, node.y, node.z);
+    const isHidden = p.sz < -0.05;
+    const isSelected = state.selectedNode?.id === node.id;
+    const isHovered = state.hoveredNode?.id === node.id;
+
+    const age = Math.min(1, (state.tick - node.born) / 40);
+    const pulse = Math.sin(state.tick * node.pulseSpeed * 0.04 + node.pulsePhase);
+
+    const baseOpacity = isHidden ? 0.12 : 0.9;
+    const finalOpacity = baseOpacity * age;
+
+    if (finalOpacity < 0.05) continue;
+
+    const r = isSelected ? 5 : isHovered ? 4.5 : 3.5;
+    const glowR = r + 6 + pulse * 3;
+
+    ctx.save();
+    ctx.globalAlpha = finalOpacity;
+
+    // Outer glow
+    if (!isHidden) {
+      const gGlow = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, glowR * 2);
+      gGlow.addColorStop(0, isSelected ? 'rgba(255, 107, 53, 0.3)' : 'rgba(74, 179, 255, 0.25)');
+      gGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = gGlow;
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, glowR * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Node dot
+    ctx.beginPath();
+    ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
+    if (isSelected) {
+      ctx.fillStyle = '#ff6b35';
+      ctx.shadowColor = '#ff6b35';
+    } else {
+      ctx.fillStyle = isHidden ? '#1a3a5c' : '#e8f4ff';
+      ctx.shadowColor = '#4ab3ff';
+    }
+    ctx.shadowBlur = isHidden ? 0 : 12;
+    ctx.fill();
+
+    // Node ring for selected
+    if (isSelected && !isHidden) {
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, r + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 107, 53, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Label
+    if (!isHidden && (age > 0.5)) {
+      const labelOpacity = Math.min(1, (age - 0.5) * 2) * (isHidden ? 0 : 1);
+      ctx.save();
+      ctx.globalAlpha = finalOpacity * labelOpacity * (isHovered || isSelected ? 1 : 0.7);
+      ctx.font = `${isSelected ? 500 : 300} 10px 'JetBrains Mono', monospace`;
+      ctx.fillStyle = isSelected ? '#ff6b35' : '#a8cce8';
+      ctx.letterSpacing = '0.05em';
+
+      const labelX = p.sx + r + 7;
+      const labelY = p.sy + 3.5;
+      ctx.fillText(node.name, labelX, labelY);
+      ctx.restore();
+    }
+  }
+}
+
+function drawPolarGuide() {
+  if (state.nodes.length < 2) return;
+  const cx = state.W / 2, cy = state.H / 2;
+  const r = state.globeRadius * state.zoom;
+
+  // Subtle axis indicators
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r * 1.1);
+  ctx.lineTo(cx, cy + r * 1.1);
+  ctx.strokeStyle = '#4ab3ff';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2, 8]);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Animation loop ───────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  state.tick++;
+
+  // Resize if needed
+  if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    state.W = canvas.width;
+    state.H = canvas.height;
+  }
+
+  // Animate globe radius and zoom
+  state.globeRadius += (state.targetGlobeRadius - state.globeRadius) * 0.04;
+  state.zoom += (state.targetZoom - state.zoom) * 0.04;
+
+  // Auto-rotate
+  if (state.autoRotate && !state.drag.active) {
+    state.rotation.y += 0.0015;
+  }
+
+  // Clear
+  ctx.clearRect(0, 0, state.W, state.H);
+
+  // Draw layers
+  drawPolarGuide();
+  drawWireframe();
+  drawEdges();
+  drawNodes();
+
+  // Hit detection for hover
+  detectHover();
+}
+
+// ── Interaction ──────────────────────────────────
+let mouseX = -9999, mouseY = -9999;
+
+function detectHover() {
+  let hit = null;
+  for (const node of state.nodes) {
+    const p = project(node.x, node.y, node.z);
+    if (p.sz < -0.1) continue;
+    const dx = mouseX - p.sx, dy = mouseY - p.sy;
+    if (Math.sqrt(dx * dx + dy * dy) < 14) {
+      hit = node; break;
+    }
+  }
+  state.hoveredNode = hit;
+  canvas.style.cursor = hit ? 'pointer' : state.drag.active ? 'grabbing' : 'crosshair';
+}
+
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  if (state.drag.active) {
+    const dx = e.clientX - state.drag.lastX;
+    const dy = e.clientY - state.drag.lastY;
+    state.rotation.y += dx * 0.006;
+    state.rotation.x += dy * 0.006;
+    state.rotation.x = Math.max(-1.2, Math.min(1.2, state.rotation.x));
+    state.drag.lastX = e.clientX;
+    state.drag.lastY = e.clientY;
+    state.autoRotate = false;
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  state.drag.active = true;
+  state.drag.lastX = e.clientX;
+  state.drag.lastY = e.clientY;
+  state.autoRotate = false;
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (!state.drag.active) return;
+  state.drag.active = false;
+  setTimeout(() => { state.autoRotate = true; }, 3000);
+});
+
+canvas.addEventListener('click', e => {
+  if (state.hoveredNode) {
+    selectNode(state.hoveredNode);
+  } else {
+    closePanel();
+  }
+});
+
+canvas.addEventListener('wheel', e => {
+  state.targetZoom = Math.max(0.4, Math.min(2, state.targetZoom - e.deltaY * 0.001));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    state.drag.active = true;
+    state.drag.lastX = e.touches[0].clientX;
+    state.drag.lastY = e.touches[0].clientY;
+    state.autoRotate = false;
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  if (state.drag.active && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - state.drag.lastX;
+    const dy = e.touches[0].clientY - state.drag.lastY;
+    state.rotation.y += dx * 0.006;
+    state.rotation.x += dy * 0.006;
+    state.drag.lastX = e.touches[0].clientX;
+    state.drag.lastY = e.touches[0].clientY;
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', () => {
+  state.drag.active = false;
+  setTimeout(() => { state.autoRotate = true; }, 3000);
+});
+
+// ── Node panel ───────────────────────────────────
+function selectNode(node) {
+  state.selectedNode = node;
+  const panel = document.getElementById('node-panel');
+  document.getElementById('panel-name').textContent = node.name;
+  document.getElementById('panel-status').textContent = 'active';
+  document.getElementById('panel-latency').textContent = `${node.latency} ms`;
+
+  const topicsEl = document.getElementById('panel-topics');
+  topicsEl.innerHTML = node.topics.map(t =>
+    `<span class="topic-pill">${t}</span>`
+  ).join('');
+
+  panel.classList.add('visible');
+}
+
+function closePanel() {
+  state.selectedNode = null;
+  document.getElementById('node-panel').classList.remove('visible');
+}
+
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+// ── Search ───────────────────────────────────────
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) { searchResults.classList.remove('visible'); return; }
+
+  const matches = state.nodes.filter(n =>
+    n.name.includes(q) || n.topics.some(t => t.includes(q))
+  ).slice(0, 6);
+
+  if (!matches.length) {
+    searchResults.innerHTML = `<div class="search-result-item" style="color:var(--text-muted)">No nodes found</div>`;
+  } else {
+    searchResults.innerHTML = matches.map(n =>
+      `<div class="search-result-item" data-id="${n.id}">
+        <div class="result-dot"></div>${n.name}
+      </div>`
+    ).join('');
+    searchResults.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const node = state.nodes.find(n => n.id === el.dataset.id);
+        if (node) {
+          selectNode(node);
+          // Orient globe toward the node
+          state.rotation.y = -Math.atan2(node.x, node.z);
+          state.rotation.x = -Math.asin(node.y);
+          state.autoRotate = false;
+          setTimeout(() => { state.autoRotate = true; }, 5000);
+        }
+        searchResults.classList.remove('visible');
+        searchInput.value = '';
+      });
+    });
+  }
+  searchResults.classList.add('visible');
+});
+
+searchInput.addEventListener('blur', () => {
+  setTimeout(() => searchResults.classList.remove('visible'), 150);
+});
+
+// ── Controls ─────────────────────────────────────
+document.getElementById('btn-add').addEventListener('click', () => addNode());
+document.getElementById('btn-add5').addEventListener('click', () => addNodes(5));
+document.getElementById('btn-add10').addEventListener('click', () => addNodes(10));
+document.getElementById('btn-reset').addEventListener('click', resetNodes);
+
+// ── Live DDS Graph — WebSocket Bridge Connection ─────────────────────────────
+//
+// Connects to the ntari-globe-bridge WebSocket server at /ws/graph.
+// When a live message arrives, the graph is reconciled with the visual state:
+//   - Known nodes (by id) keep their current sphere position
+//   - New nodes are placed by latency (high latency → far side of globe)
+//   - Removed nodes fade out
+//   - Health state updates node color
+//   - Falls back to demo simulation if bridge is unreachable
+//
+// Bridge endpoint: ws://<same host>/ws/graph  (proxied by Caddy on ntari-web)
+// Direct endpoint: ws://localhost:9090/graph  (for local development)
+
+const bridge = {
+  ws: null,
+  connected: false,
+  retryDelay: 3000,
+  retryTimer: null,
+  liveMode: false,         // true once first real message received
+  knownIds: new Set(),     // node ids seen in last snapshot
+  localNodeUUID: null,
+};
+
+// Resolve bridge URL: same host via Caddy proxy, or direct localhost
+function _bridgeUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = location.hostname;
+  // If served by ntari-web (any host other than localhost on std port)
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    return `${proto}//${location.host}/ws/graph`;
+  }
+  // Local development / direct access
+  return `ws://127.0.0.1:9090/graph`;
+}
+// Expose for co-loaded extension scripts (e.g. ixp_topics.js)
+window._bridgeUrl = _bridgeUrl;
+
+// Map latency (ms) to a sphere longitude offset from the local node (lat:20, lon:-30)
+// Low latency → near the local node; high latency → opposite hemisphere
+function _latencyToPosition(latencyMs, index) {
+  // Clamp latency to a reasonable range
+  const ms = Math.min(Math.max(latencyMs || 1, 1), 2000);
+  // Angular distance: 0ms = 0°, 2000ms = 180° (diametrically opposite)
+  const angularDist = (ms / 2000) * 180;
+  // Base: local node is at lat:20, lon:-30
+  // Spread around a great circle from there
+  const angle = (index * 137.5) % 360; // golden angle distribution
+  const rad = angularDist * (Math.PI / 180);
+  const lat = 20 + Math.sin(rad) * angularDist * Math.cos(angle * Math.PI / 180);
+  const lon = -30 + angularDist * Math.sin(angle * Math.PI / 180);
+  return { lat: Math.max(-80, Math.min(80, lat)), lon: ((lon + 540) % 360) - 180 };
+}
+
+// Health string → node visual modifier
+function _healthToState(health) {
+  switch ((health || '').toLowerCase()) {
+    case 'healthy':  return 'active';
+    case 'degraded': return 'degraded';
+    case 'failed':   return 'failed';
+    default:         return 'unknown';
+  }
+}
+
+// Reconcile a graph snapshot from the bridge with visual state
+function _applyGraphSnapshot(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.nodes)) return;
+
+  bridge.liveMode = true;
+  bridge.localNodeUUID = snapshot.local_node_uuid || null;
+
+  const incomingIds = new Set(snapshot.nodes.map(n => n.id));
+  let newNodesAdded = false;
+
+  // Add or update nodes
+  snapshot.nodes.forEach((liveNode, idx) => {
+    const existing = state.nodes.find(n => n.id === liveNode.id);
+    if (existing) {
+      // Update mutable fields — preserve position
+      existing.latency = liveNode.latency || existing.latency;
+      existing.topics  = liveNode.topics  || existing.topics;
+      existing.health  = _healthToState(liveNode.health);
+      existing.name    = liveNode.name || existing.name;
+    } else {
+      // New node: place by latency
+      const { lat, lon } = _latencyToPosition(liveNode.latency || 50, idx);
+      const pt = spherePoint(lat, lon);
+      const node = {
+        id:         liveNode.id,
+        name:       liveNode.name || liveNode.id.replace(/^\//, '').replace(/\//g, '.'),
+        lat, lon,
+        x: pt.x, y: pt.y, z: pt.z,
+        topics:     liveNode.topics || [],
+        latency:    liveNode.latency || 1,
+        health:     _healthToState(liveNode.health),
+        pulsePhase: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.6 + Math.random() * 0.8,
+        born:       state.tick,
+        isLocal:    snapshot.local_node_uuid &&
+                    liveNode.id.includes(snapshot.local_node_uuid),
+      };
+      state.nodes.push(node);
+      newNodesAdded = true;
+    }
+  });
+
+  // Remove nodes no longer in the graph
+  state.nodes = state.nodes.filter(n => incomingIds.has(n.id));
+
+  // Reconcile edges
+  if (Array.isArray(snapshot.edges)) {
+    const edgeKeys = new Set(snapshot.edges.map(e => `${e.from}→${e.to}`));
+    // Remove stale edges
+    state.edges = state.edges.filter(e => edgeKeys.has(`${e.from}→${e.to}`));
+    // Add new edges
+    snapshot.edges.forEach(e => {
+      if (!state.edges.find(ex => ex.from === e.from && ex.to === e.to)) {
+        state.edges.push({ from: e.from, to: e.to, born: state.tick });
+      }
+    });
+  }
+
+  if (newNodesAdded || state.nodes.length !== bridge.knownIds.size) {
+    bridge.knownIds = incomingIds;
+    updateGlobeTarget();
+    updateHUD();
+  }
+}
+
+// Update status bar to reflect connection state
+function _setStatus(text, pulse) {
+  const el = document.getElementById('status-text');
+  const dot = document.querySelector('.status-dot');
+  if (el) el.textContent = text;
+  if (dot) {
+    dot.style.background = pulse === 'live'
+      ? 'var(--node-pulse)'
+      : pulse === 'warn'
+        ? 'var(--accent)'
+        : 'var(--text-muted)';
+    dot.style.boxShadow = pulse === 'live'
+      ? '0 0 6px var(--node-pulse)'
+      : 'none';
+  }
+}
+
+function _connectBridge() {
+  const url = _bridgeUrl();
+  _setStatus('Connecting to DDS graph…', 'warn');
+
+  try {
+    bridge.ws = new WebSocket(url);
+  } catch (e) {
+    _scheduleBridgeRetry();
+    return;
+  }
+
+  bridge.ws.onopen = () => {
+    bridge.connected = true;
+    clearTimeout(bridge.retryTimer);
+    _setStatus(`Graph online · DDS domain ${bridge.domain || 0}`, 'live');
+  };
+
+  bridge.ws.onmessage = (evt) => {
+    try {
+      const snapshot = JSON.parse(evt.data);
+      if (snapshot.type === 'graph_snapshot') {
+        bridge.domain = snapshot.domain;
+        _applyGraphSnapshot(snapshot);
+        _setStatus(`Graph online · DDS domain ${snapshot.domain}`, 'live');
+        // Notify co-loaded extensions without opening a second WebSocket
+        document.dispatchEvent(new CustomEvent('ntari:snapshot', { detail: snapshot }));
+      }
+    } catch (e) {
+      // Malformed message — ignore
+    }
+  };
+
+  bridge.ws.onclose = () => {
+    bridge.connected = false;
+    if (bridge.liveMode) {
+      // Lost a live connection — show warning but keep last-known graph visible
+      _setStatus('Graph offline · last snapshot retained', 'warn');
+    }
+    _scheduleBridgeRetry();
+  };
+
+  bridge.ws.onerror = () => {
+    bridge.connected = false;
+    _scheduleBridgeRetry();
+  };
+}
+
+function _scheduleBridgeRetry() {
+  clearTimeout(bridge.retryTimer);
+  if (!bridge.liveMode) {
+    // Never connected — stay in demo mode, retry quietly in background
+    _setStatus('Graph online · demo mode', 'live');
+  }
+  bridge.retryTimer = setTimeout(_connectBridge, bridge.retryDelay);
+  // Back off gradually up to 30s
+  bridge.retryDelay = Math.min(bridge.retryDelay * 1.5, 30000);
+}
+
+// Patch drawNodes to render health state visually
+// healthy = default white glow
+// degraded = amber glow
+// failed = dim red, no fill
+// local node = accent color (viewer-facing pole)
+const _origDrawNodes = drawNodes;
+function drawNodes() {
+  // We override node color logic by patching each node's visual before draw.
+  // The actual drawNodes function uses ctx directly; we inject health color
+  // by temporarily setting a per-node color hint that the draw function reads.
+  // Since modifying drawNodes internals would require deep surgery, we instead
+  // post-process with a health overlay drawn after the standard render.
+  _origDrawNodes();
+
+  // Health overlay pass: re-draw nodes that have non-standard health
+  for (const node of state.nodes) {
+    if (!node.health || node.health === 'active' || node.health === 'unknown') continue;
+    const p = project(node.x, node.y, node.z);
+    if (p.sz < -0.1) continue;
+    const alpha = Math.max(0, Math.min(1, (p.sz + 1) / 1.5));
+
+    if (node.health === 'degraded') {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, 5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffaa33';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    } else if (node.health === 'failed') {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, 5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // X mark
+      ctx.beginPath();
+      ctx.moveTo(p.sx - 4, p.sy - 4); ctx.lineTo(p.sx + 4, p.sy + 4);
+      ctx.moveTo(p.sx + 4, p.sy - 4); ctx.lineTo(p.sx - 4, p.sy + 4);
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // IXP dim pass: when IXP mode is active, paint a dark disc over every
+  // non-IXP node so the exchange services stand out.
+  // ixp_topics.js sets node._ixpDimmed = true; this pass reads it.
+  for (const node of state.nodes) {
+    if (!node._ixpDimmed) continue;
+    const p = project(node.x, node.y, node.z);
+    if (p.sz < -0.1) continue;
+    const alpha = Math.max(0, Math.min(1, (p.sz + 1) / 1.5));
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.82;
+    ctx.beginPath();
+    ctx.arc(p.sx, p.sy, 14, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(5, 6, 8, 0.88)'; // --void background colour
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Init ──────────────────────────────────────────
+state.W = window.innerWidth;
+state.H = window.innerHeight;
+canvas.width = state.W;
+canvas.height = state.H;
+
+// Attempt live bridge connection
+_connectBridge();
+
+// Demo simulation: only runs when bridge has never connected
+// Uses a longer delay so the WebSocket has time to establish first
+state.targetGlobeRadius = state.baseRadius;
+state.globeRadius = state.baseRadius;
+setTimeout(() => {
+  if (!bridge.liveMode) {
+    // Bridge not available — run demo
+    addNode('core.scheduler');
+    setTimeout(() => addNode('mesh.relay_0'), 600);
+  }
+}, 2500);
+
+animate();
+</script>
+</body>
+</html>

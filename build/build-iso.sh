@@ -668,11 +668,25 @@ EOF
 
         log "Phase 7–12 service overlay entries complete"
 
-        # Phase 8 (Globe interface) — moved to SoHoLINK.
-        # The WebSocket bridge (ntari-globe-bridge) and Globe UI are SoHoLINK
-        # application components. NTARI OS exposes the DDS graph; SoHoLINK
-        # visualises it. See SoHoLINK/ui/globe-interface/ and
-        # SoHoLINK/ntari-os-services/ntari-globe-bridge.initd.
+        # Phase 8 (Globe interface) — source is ui/globe-interface/ in this repo.
+        # index.html: Canvas 2D globe + WebSocket bridge client.
+        # ixp_topics.js: IXP mode extension (loaded alongside index.html).
+        # Directory was already created above: ${OVERLAY_DIR}/var/lib/ntari/interface
+        GLOBE_SRC="${PROJECT_DIR}/ui/globe-interface"
+        if [ -f "${GLOBE_SRC}/index.html" ]; then
+            cp "${GLOBE_SRC}/index.html" \
+                "${OVERLAY_DIR}/var/lib/ntari/interface/index.html"
+            log "Included: globe index.html"
+        else
+            warn "globe index.html not found at ${GLOBE_SRC}/index.html"
+        fi
+        if [ -f "${GLOBE_SRC}/ixp_topics.js" ]; then
+            cp "${GLOBE_SRC}/ixp_topics.js" \
+                "${OVERLAY_DIR}/var/lib/ntari/interface/ixp_topics.js"
+            log "Included: globe ixp_topics.js"
+        else
+            warn "ixp_topics.js not found at ${GLOBE_SRC}/ixp_topics.js"
+        fi
 
         # ── Phase 9: Cooperative Federation ──────────────────────────────────
         # Install the federation bridge script and its OpenRC service.
