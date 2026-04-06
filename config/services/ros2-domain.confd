@@ -20,4 +20,4 @@ CYCLONEDDS_URI_FILE="/etc/ntari/cyclonedds.xml"
 
 # ROS2 installation prefix. Only change if you installed ROS2
 # to a non-standard location.
-ROS_INSTALL_PREFIX="/opt/ros/jazzy"
+ROS_INSTALL_PREFIX="/usr/ros/jazzy"
