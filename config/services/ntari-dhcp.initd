@@ -62,7 +62,7 @@ depend() {
 }
 
 start_pre() {
-    mkdir -p /var/log/ntari
+    mkdir -p /var/log/ntari /var/log/kea
     mkdir -p /run/kea
     mkdir -p /var/lib/kea
 
@@ -117,7 +117,7 @@ start_pre() {
         "name": "kea-dhcp4",
         "output_options": [
           {
-            "output": "/var/log/ntari/kea-dhcp4.log",
+            "output": "/var/log/kea/kea-dhcp4.log",
             "maxsize": 1048576,
             "maxver": 3
           }

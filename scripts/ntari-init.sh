@@ -97,8 +97,11 @@ EOF
 fi
 
 # ── Set permissions ──────────────────────────────────────────
-chmod 700 "${NTARI_CONFIG_DIR}"
-chmod 700 "${NTARI_DATA_DIR}"
+# 711 on config/data dirs: root-owned, but non-root service users
+# (e.g. redis) need execute/traverse permission to access their
+# config files and data subdirs. Individual files retain 640/600.
+chmod 711 "${NTARI_CONFIG_DIR}"
+chmod 711 "${NTARI_DATA_DIR}"
 chmod 755 "${NTARI_LOG_DIR}"
 log "Set directory permissions"
 

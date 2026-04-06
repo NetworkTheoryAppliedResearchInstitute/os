@@ -40,8 +40,10 @@ command_args="-u ldap -h ldap://127.0.0.1:${LDAP_PORT}/ -f ${LDAP_CONF}"
 pidfile="/run/openldap/slapd.pid"
 command_user="root"
 
-output_log="/var/log/ntari/identity.log"
-error_log="/var/log/ntari/identity.log"
+# slapd self-daemonizes — do NOT set output_log/error_log here.
+# OpenRC passes --stdout/--stderr to start-stop-daemon only with --background;
+# using them without command_background="yes" causes a startup error.
+# slapd writes its own log via loglevel directive in slapd.conf.
 
 # ── ROS2 environment ─────────────────────────────────────────────────────────
 export AMENT_PREFIX_PATH="/usr/ros/jazzy"
