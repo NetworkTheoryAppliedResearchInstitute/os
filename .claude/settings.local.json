@@ -171,7 +171,17 @@
       "Bash(\"$VBOX\" controlvm:*)",
       "Bash(SHOT=\"C:/Users/Jodson Graves/Documents/NTARI OS/build/build-output/ntari-boot.png\")",
       "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 apk add --quiet caddy)",
-      "Bash(MSYS_NO_PATHCONV=1 docker run --rm --privileged ntari-builder:1.5 sh -c \"apk add caddy --quiet && which caddy\")"
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm --privileged ntari-builder:1.5 sh -c \"apk add caddy --quiet && which caddy\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"apk add --no-cache bird 2>/dev/null && which bird && ls /usr/sbin/bird /usr/bin/bird 2>&1\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"apk fetch --stdout bird 2>/dev/null | tar -tz 2>/dev/null | grep bird\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"find / -name mkimage.sh 2>/dev/null | head -5\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"ls /tmp/aports/scripts/mkimage.sh 2>/dev/null || find /usr -name mkimage.sh 2>/dev/null || find /tmp -name mkimage.sh 2>/dev/null\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"find / -name mkimage.sh 2>/dev/null | head -5 && find / -name mkimg.*.sh 2>/dev/null | head -5\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \":*)",
+      "Bash(curl -s \"https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.23-stable/scripts/mkimage.sh\")",
+      "Bash(curl -s \"https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.23-stable/scripts/mkimg.standard.sh\")",
+      "Bash(curl -s \"https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.23-stable/scripts/mkimg.base.sh\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 sh -c \"apk fetch --stdout redis 2>/dev/null | tar -tz 2>/dev/null | grep -E ''redis|bin''\")"
     ]
   }
 }

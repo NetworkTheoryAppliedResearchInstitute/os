@@ -135,6 +135,7 @@ if [ "${EDITION}" = "ros2" ]; then
         samba-server \
         samba-common-tools \
         openldap \
+        openldap-back-mdb \
         pciutils \
         iproute2 \
         bird || err "Service package install failed — is the ISO still mounted at /media/cdrom/apks/?"

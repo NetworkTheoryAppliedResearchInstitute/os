@@ -57,6 +57,12 @@ start_pre() {
     mkdir -p /var/log/ntari
     mkdir -p /var/lib/ntari/redis
 
+    # Ensure redis log file exists and is writable by the redis user
+    # Redis runs as command_user="redis" but /var/log/ntari/ is root-owned.
+    # Redis crashes immediately if it cannot open its log file on startup.
+    touch /var/log/ntari/redis.log
+    chown redis:redis /var/log/ntari/redis.log 2>/dev/null || true
+
     # Ensure the redis user and data directory have correct ownership
     if id redis >/dev/null 2>&1; then
         chown redis:redis /var/lib/ntari/redis 2>/dev/null || true

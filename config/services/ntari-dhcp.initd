@@ -34,8 +34,10 @@ command_args="-c ${KEA_CONF}"
 pidfile="/run/kea/kea-dhcp4.pid"
 command_user="root"
 
-output_log="/var/log/ntari/dhcp.log"
-error_log="/var/log/ntari/dhcp.log"
+# kea-dhcp4 self-daemonizes — do NOT set output_log/error_log here.
+# OpenRC passes --stdout/--stderr to start-stop-daemon only with --background;
+# using them without command_background="yes" causes a startup error.
+# Kea writes its own log to /var/log/ntari/kea-dhcp4.log via its JSON config.
 
 # ── ROS2 environment ─────────────────────────────────────────────────────────
 export AMENT_PREFIX_PATH="/usr/ros/jazzy"
