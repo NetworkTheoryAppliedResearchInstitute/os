@@ -279,7 +279,8 @@ profile_ntari_ros2() {
         caddy
         kea
         wireguard-tools
-        samba
+        samba-server
+        samba-common-tools
         openldap
         pciutils
         iptables

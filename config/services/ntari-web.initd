@@ -22,7 +22,7 @@ name="ntari-web"
 description="NTARI Web Node — Caddy + ROS2 health publishing"
 
 CADDY_CONF="${NTARI_WEB_CADDY_CONF:-/etc/ntari/Caddyfile}"
-command="/usr/sbin/caddy"
+command="/usr/bin/caddy"
 command_args="run --config ${CADDY_CONF}"
 command_background="yes"
 pidfile="/run/ntari-web.pid"
@@ -136,8 +136,8 @@ HTML_EOF
     fi
 
     # Verify Caddy binary
-    if [ ! -x /usr/sbin/caddy ]; then
-        eerror "Caddy not found at /usr/sbin/caddy"
+    if [ ! -x /usr/bin/caddy ]; then
+        eerror "Caddy not found at /usr/bin/caddy"
         eerror "Install via: apk add caddy"
         return 1
     fi

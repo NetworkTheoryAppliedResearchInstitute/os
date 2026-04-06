@@ -158,7 +158,20 @@
       "Bash(do echo:*)",
       "Read(//c/Users/Jodson Graves/Documents/NTARI OS/**)",
       "Bash(python3 -c \"import shutil, os; shutil.rmtree\\(os.path.join\\(os.getcwd\\(\\), '';C''\\), ignore_errors=True\\); print\\(''done''\\)\")",
-      "Bash(for dir:*)"
+      "Bash(for dir:*)",
+      "Read(//c/Program Files/Oracle/VirtualBox/**)",
+      "Read(//c/Program Files \\(x86\\)/Oracle/VirtualBox/**)",
+      "Bash(ISO=\"C:/Users/Jodson Graves/Documents/NTARI OS/build/build-output/ntari-os-1.5.0-x86_64-ros2-20260405.iso\")",
+      "Bash(__NEW_LINE_d00724b9384fa661__ \"$VBOX\" createvm --name \"NTARI-OS-Test\" --ostype Linux_64 --register)",
+      "Bash(__NEW_LINE_4e0b90639d5d384b__ \"$VBOX\" modifyvm \"NTARI-OS-Test\" --memory 3072 --cpus 2 --vram 16 --nic1 nat --audio none)",
+      "Bash(__NEW_LINE_77f32db7d786fe7c__ \"$VBOX\" storagectl \"NTARI-OS-Test\" --name \"IDE\" --add ide)",
+      "Bash(\"$VBOX\" storageattach:*)",
+      "Bash(\"$VBOX\" startvm:*)",
+      "Bash(\"$VBOX\" modifyvm:*)",
+      "Bash(\"$VBOX\" controlvm:*)",
+      "Bash(SHOT=\"C:/Users/Jodson Graves/Documents/NTARI OS/build/build-output/ntari-boot.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm ntari-builder:1.5 apk add --quiet caddy)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm --privileged ntari-builder:1.5 sh -c \"apk add caddy --quiet && which caddy\")"
     ]
   }
 }
