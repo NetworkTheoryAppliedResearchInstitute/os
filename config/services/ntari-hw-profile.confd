@@ -1,0 +1,4 @@
+# ntari-hw-profile OpenRC companion config
+# Hardware profile detection service
+# Override ROS_DOMAIN_ID if this node should use a non-default domain
+ROS_DOMAIN_ID=0

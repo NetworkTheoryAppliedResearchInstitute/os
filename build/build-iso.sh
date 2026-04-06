@@ -434,7 +434,7 @@ EOF
     mkdir -p "${OVERLAY_DIR}/usr/local/bin"
 
     # Copy scripts from project
-    for script in ntari-admin.sh ntari-init.sh health-check.sh harden-system.sh \
+    for script in ntari-admin.sh ntari-init.sh \
                   setup-ros2.sh ros2-node-health.sh \
                   ntari-hw-profile.sh ntari-node-policy.sh \
                   ntari-scheduler.sh; do
