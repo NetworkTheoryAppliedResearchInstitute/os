@@ -28,16 +28,15 @@ description="NTARI DHCP Node — Kea DHCPv4 + ROS2 health publishing"
 KEA_CONF="${NTARI_DHCP_KEA_CONF:-/etc/ntari/kea-dhcp4.conf}"
 command="/usr/sbin/kea-dhcp4"
 command_args="-c ${KEA_CONF}"
-# kea-dhcp4 daemonizes itself and writes its own PID file.
-# Do NOT use command_background="yes" — that conflicts with kea's own
-# fork/pidfile management. OpenRC reads kea's pidfile for status checks.
-pidfile="/run/kea/kea-dhcp4.pid"
+# kea-dhcp4 3.x runs in the FOREGROUND — it does NOT self-daemonize.
+# Use command_background="yes" so OpenRC forks it into the background
+# and manages the pidfile via --make-pidfile.
+command_background="yes"
+pidfile="/run/ntari-dhcp.pid"
 command_user="root"
 
-# kea-dhcp4 self-daemonizes — do NOT set output_log/error_log here.
-# OpenRC passes --stdout/--stderr to start-stop-daemon only with --background;
-# using them without command_background="yes" causes a startup error.
-# Kea writes its own log to /var/log/ntari/kea-dhcp4.log via its JSON config.
+# Kea writes its own log to /var/log/kea/kea-dhcp4.log via its JSON config.
+# output_log/error_log are intentionally omitted — Kea's JSON logger handles it.
 
 # ── ROS2 environment ─────────────────────────────────────────────────────────
 export AMENT_PREFIX_PATH="/usr/ros/jazzy"
