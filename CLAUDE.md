@@ -136,7 +136,12 @@ net → ros2-domain → ntari-ntp → ntari-dhcp → ntari-dns → ntari-cache
 - **kanidm not in Alpine 3.23**: `ntari-identity` needs redesign; kanidm is not packaged for Alpine — use OpenLDAP (slapd) instead
 - **ros2-domain OpenRC pattern**: `ros2 daemon start` is one-shot (exits after launching daemon) — use custom `start()`/`stop()` functions, NOT `command_background="yes"` which marks it as crashed
 - **ntari-cache OpenRC pattern**: Redis config must have `daemonize no` (OpenRC manages the process) and no `pidfile` directive in redis.conf — otherwise pidfiles conflict
-- **ntari-dhcp OpenRC pattern**: kea-dhcp4 self-daemonizes; omit `command_background="yes"` and let kea write its own pidfile at `/run/kea/kea-dhcp4.pid`
+- **ntari-dhcp OpenRC pattern**: kea-dhcp4 3.x does NOT self-daemonize (daemon mode removed in 3.x); use `command_background="yes"` with `pidfile="/run/ntari-dhcp.pid"` so OpenRC manages the background fork and pidfile
 - **Modloop extra nesting**: Alpine live ISO modloop squashfs has `modules/KVER/` at root; after mounting at `/lib/modules/`, path becomes `/lib/modules/modules/KVER/` — modprobe can't find drivers; fix with bind-mount in ntari-init.sh
 - **ntari-vpn expected failure**: WireGuard interface fails on first boot without peer config — this is by design; admin must configure peers manually
+- **ntari-cache OpenRC log**: OpenRC's `output_log`/`error_log` are opened as `command_user` (redis), NOT root — pre-create both `/var/log/ntari/redis.log` and `/var/log/ntari/cache.log` with `chown redis:redis` in `start_pre()`
+- **ntari-init.sh dir permissions**: `/etc/ntari` and `/var/lib/ntari` use `chmod 711` (not 700) — non-root service users (e.g. redis) need execute/traverse permission to access config files and data subdirs inside; individual files retain 640/600
+- **Kea 3.0.2 log path restriction**: Kea enforces that log file `output` paths are under `/var/log/kea`; paths under `/var/log/ntari` are rejected with `COMMAND_PROCESS_ERROR2 invalid path`
+- **slapd output_log/error_log conflict**: slapd does not use `command_background="yes"` — do NOT set `output_log`/`error_log` in ntari-identity.initd (same restriction as kea)
+- **openldap-back-mdb module load**: slapd.conf must have `modulepath /usr/lib/openldap` and `moduleload back_mdb` before `database mdb` — the MDB backend is a loadable module on Alpine (provided by `openldap-back-mdb` package)
 - **Caddy startup delay**: Caddy takes ~90s to start when checking for TLS cert; `rc-service ntari-web start` blocks until Caddy is ready — not a bug
