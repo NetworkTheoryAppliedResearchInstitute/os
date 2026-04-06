@@ -63,6 +63,12 @@ start_pre() {
     touch /var/log/ntari/redis.log
     chown redis:redis /var/log/ntari/redis.log 2>/dev/null || true
 
+    # Ensure OpenRC output_log/error_log is also writable by the redis user.
+    # start-stop-daemon opens output_log/error_log as command_user (redis),
+    # not as root — so the file must be pre-created and chowned.
+    touch /var/log/ntari/cache.log
+    chown redis:redis /var/log/ntari/cache.log 2>/dev/null || true
+
     # Ensure the redis user and data directory have correct ownership
     if id redis >/dev/null 2>&1; then
         chown redis:redis /var/lib/ntari/redis 2>/dev/null || true

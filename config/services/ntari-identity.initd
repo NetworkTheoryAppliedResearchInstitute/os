@@ -122,6 +122,10 @@ pidfile     /run/openldap/slapd.pid
 argsfile    /run/openldap/slapd.args
 loglevel    none
 
+# Load the MDB backend module (provided by openldap-back-mdb package)
+modulepath  /usr/lib/openldap
+moduleload  back_mdb
+
 # MDB (Memory-Mapped Database) — efficient for edge hardware
 database    mdb
 suffix      "dc=ntari,dc=local"
