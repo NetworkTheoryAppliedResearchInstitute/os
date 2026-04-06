@@ -117,6 +117,29 @@ if [ "${EDITION}" = "ros2" ]; then
     echo "${GREEN}═══════════════════════════════════════════════════════${NC}"
     echo ""
 
+    # ── Install service package binaries ────────────────────────────────────
+    # Service binaries (dnsmasq, caddy, redis, kea, samba, etc.) are staged
+    # in the ISO apks/ cache but NOT pre-installed into the live squashfs.
+    # Alpine mkimage apks= only populates the ISO's local APK repository at
+    # /apks/$ARCH/ — it does not pre-install into the running filesystem.
+    # All packages below are available offline from /media/cdrom/apks/ —
+    # no internet required as long as the ISO is still mounted.
+    info "Installing service package binaries from ISO APK cache..."
+    apk add \
+        dnsmasq \
+        chrony \
+        redis \
+        kea \
+        caddy \
+        wireguard-tools \
+        samba-server \
+        samba-common-tools \
+        openldap \
+        pciutils \
+        iproute2 \
+        bird || err "Service package install failed — is the ISO still mounted at /media/cdrom/apks/?"
+    log "Service packages installed"
+
     SETUP_ROS2="/usr/local/bin/setup-ros2.sh"
     if [ -f "${SETUP_ROS2}" ]; then
         info "Running ${SETUP_ROS2}..."
